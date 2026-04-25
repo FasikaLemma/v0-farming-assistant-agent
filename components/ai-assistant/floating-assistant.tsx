@@ -19,12 +19,19 @@ import {
   User,
   Sparkles,
   ImagePlus,
+  GripVertical,
+  RotateCcw,
 } from 'lucide-react'
 
 interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+}
+
+interface Position {
+  x: number
+  y: number
 }
 
 const quickSuggestions = [
@@ -38,6 +45,16 @@ function generateId(): string {
   return `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 }
 
+// Corner positions for quick snap
+const CORNER_POSITIONS = {
+  'bottom-right': { x: 24, y: 24 },
+  'bottom-left': { x: 24, y: 24 },
+  'top-right': { x: 24, y: 24 },
+  'top-left': { x: 24, y: 24 },
+}
+
+type Corner = keyof typeof CORNER_POSITIONS
+
 export function FloatingAssistant() {
   const [isOpen, setIsOpen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -47,9 +64,165 @@ export function FloatingAssistant() {
   const [isLoading, setIsLoading] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
   
+  // Dragging state
+  const [isDragging, setIsDragging] = useState(false)
+  const [position, setPosition] = useState<Position>({ x: 24, y: 24 })
+  const [corner, setCorner] = useState<Corner>('bottom-right')
+  const [showCornerMenu, setShowCornerMenu] = useState(false)
+  
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const dragStartRef = useRef<{ x: number; y: number; buttonX: number; buttonY: number } | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
+
+  // Get button position based on corner
+  const getButtonStyle = useCallback(() => {
+    const base: React.CSSProperties = {
+      position: 'fixed',
+      zIndex: 50,
+      transition: isDragging ? 'none' : 'all 0.3s ease-out',
+    }
+
+    if (corner === 'bottom-right') {
+      return { ...base, right: position.x, bottom: position.y }
+    } else if (corner === 'bottom-left') {
+      return { ...base, left: position.x, bottom: position.y }
+    } else if (corner === 'top-right') {
+      return { ...base, right: position.x, top: position.y }
+    } else {
+      return { ...base, left: position.x, top: position.y }
+    }
+  }, [position, corner, isDragging])
+
+  // Get panel position based on corner
+  const getPanelStyle = useCallback(() => {
+    const base: React.CSSProperties = {
+      position: 'fixed',
+      zIndex: 50,
+    }
+
+    if (isExpanded) {
+      return { ...base, inset: '1rem' }
+    }
+
+    if (corner === 'bottom-right') {
+      return { ...base, right: '1.5rem', bottom: '1.5rem' }
+    } else if (corner === 'bottom-left') {
+      return { ...base, left: '1.5rem', bottom: '1.5rem' }
+    } else if (corner === 'top-right') {
+      return { ...base, right: '1.5rem', top: '1.5rem' }
+    } else {
+      return { ...base, left: '1.5rem', top: '1.5rem' }
+    }
+  }, [corner, isExpanded])
+
+  // Handle drag start
+  const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    
+    dragStartRef.current = {
+      x: clientX,
+      y: clientY,
+      buttonX: position.x,
+      buttonY: position.y,
+    }
+    setIsDragging(true)
+  }, [position])
+
+  // Handle drag move
+  useEffect(() => {
+    if (!isDragging) return
+
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      if (!dragStartRef.current) return
+      
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+      
+      const deltaX = clientX - dragStartRef.current.x
+      const deltaY = clientY - dragStartRef.current.y
+      
+      const windowWidth = window.innerWidth
+      const windowHeight = window.innerHeight
+      const buttonSize = 56 // 14 * 4 = 56px
+      const margin = 8
+      
+      let newX: number
+      let newY: number
+      let newCorner: Corner = corner
+      
+      // Determine which corner based on position
+      const centerX = clientX
+      const centerY = clientY
+      
+      if (centerX > windowWidth / 2) {
+        // Right side
+        newX = Math.max(margin, Math.min(windowWidth - buttonSize - margin, windowWidth - clientX - buttonSize / 2))
+        if (centerY > windowHeight / 2) {
+          newCorner = 'bottom-right'
+          newY = Math.max(margin, Math.min(windowHeight - buttonSize - margin, windowHeight - clientY - buttonSize / 2))
+        } else {
+          newCorner = 'top-right'
+          newY = Math.max(margin, Math.min(windowHeight - buttonSize - margin, clientY - buttonSize / 2))
+        }
+      } else {
+        // Left side
+        newX = Math.max(margin, Math.min(windowWidth - buttonSize - margin, clientX - buttonSize / 2))
+        if (centerY > windowHeight / 2) {
+          newCorner = 'bottom-left'
+          newY = Math.max(margin, Math.min(windowHeight - buttonSize - margin, windowHeight - clientY - buttonSize / 2))
+        } else {
+          newCorner = 'top-left'
+          newY = Math.max(margin, Math.min(windowHeight - buttonSize - margin, clientY - buttonSize / 2))
+        }
+      }
+      
+      setPosition({ x: newX, y: newY })
+      setCorner(newCorner)
+    }
+
+    const handleEnd = () => {
+      setIsDragging(false)
+      dragStartRef.current = null
+      
+      // Snap to edge
+      setPosition(prev => ({
+        x: Math.min(prev.x, 24),
+        y: Math.min(prev.y, 24),
+      }))
+    }
+
+    document.addEventListener('mousemove', handleMove)
+    document.addEventListener('mouseup', handleEnd)
+    document.addEventListener('touchmove', handleMove, { passive: false })
+    document.addEventListener('touchend', handleEnd)
+
+    return () => {
+      document.removeEventListener('mousemove', handleMove)
+      document.removeEventListener('mouseup', handleEnd)
+      document.removeEventListener('touchmove', handleMove)
+      document.removeEventListener('touchend', handleEnd)
+    }
+  }, [isDragging, corner])
+
+  // Reset position to default
+  const resetPosition = () => {
+    setCorner('bottom-right')
+    setPosition({ x: 24, y: 24 })
+    setShowCornerMenu(false)
+  }
+
+  // Move to specific corner
+  const moveToCorner = (newCorner: Corner) => {
+    setCorner(newCorner)
+    setPosition({ x: 24, y: 24 })
+    setShowCornerMenu(false)
+  }
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -193,34 +366,98 @@ export function FloatingAssistant() {
 
   return (
     <>
-      {/* Floating Button */}
+      {/* Floating Draggable Button */}
       <button
-        onClick={() => setIsOpen(true)}
+        ref={buttonRef}
+        onMouseDown={handleDragStart}
+        onTouchStart={handleDragStart}
+        onClick={(e) => {
+          if (!isDragging) {
+            setIsOpen(true)
+          }
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          setShowCornerMenu(true)
+        }}
+        style={getButtonStyle()}
         className={cn(
-          'fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg',
-          'flex items-center justify-center transition-all duration-300 hover:scale-110 hover:shadow-xl',
+          'w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg',
+          'flex items-center justify-center',
+          'hover:scale-110 hover:shadow-xl active:scale-95',
           'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-          isOpen && 'scale-0 opacity-0'
+          'touch-manipulation select-none',
+          isDragging && 'cursor-grabbing scale-110 shadow-2xl',
+          !isDragging && 'cursor-grab',
+          isOpen && 'scale-0 opacity-0 pointer-events-none'
         )}
-        aria-label="Open AI Assistant"
+        aria-label="Open AI Assistant (drag to reposition)"
       >
         <Sparkles className="w-6 h-6" />
         <span className="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full animate-pulse" />
+        
+        {/* Drag indicator */}
+        <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100">
+          <GripVertical className="w-3 h-3" />
+        </span>
       </button>
+
+      {/* Corner Selection Menu */}
+      {showCornerMenu && !isOpen && (
+        <>
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setShowCornerMenu(false)}
+          />
+          <div 
+            className="fixed z-50 bg-card rounded-xl shadow-xl border p-2 min-w-[160px]"
+            style={{
+              ...getButtonStyle(),
+              transform: corner.includes('right') ? 'translateX(-100%)' : 'translateX(60px)',
+            }}
+          >
+            <p className="text-xs font-medium text-muted-foreground px-2 py-1 uppercase tracking-wider">
+              Position
+            </p>
+            <div className="space-y-1">
+              {(['top-left', 'top-right', 'bottom-left', 'bottom-right'] as Corner[]).map((c) => (
+                <button
+                  key={c}
+                  onClick={() => moveToCorner(c)}
+                  className={cn(
+                    'w-full text-left px-3 py-2 rounded-lg text-sm transition-colors',
+                    'hover:bg-muted',
+                    corner === c && 'bg-primary/10 text-primary font-medium'
+                  )}
+                >
+                  {c.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                </button>
+              ))}
+              <hr className="my-1" />
+              <button
+                onClick={resetPosition}
+                className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted flex items-center gap-2"
+              >
+                <RotateCcw className="w-3 h-3" />
+                Reset Position
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Chat Panel */}
       <div
+        style={getPanelStyle()}
         className={cn(
-          'fixed z-50 transition-all duration-300 ease-out',
-          isExpanded
-            ? 'inset-4 md:inset-8'
-            : 'bottom-6 right-6 w-[calc(100vw-3rem)] max-w-md h-[70vh] max-h-[600px]',
-          isOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8 pointer-events-none'
+          'transition-all duration-300 ease-out',
+          !isExpanded && 'w-[calc(100vw-3rem)] max-w-md h-[70vh] max-h-[600px]',
+          isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
         )}
       >
         <Card className="flex flex-col h-full shadow-2xl border-2 overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b bg-primary/5">
+          <div className="flex items-center justify-between p-4 border-b bg-primary/5 shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
                 <Leaf className="w-5 h-5 text-primary-foreground" />
@@ -314,7 +551,7 @@ export function FloatingAssistant() {
                           : 'bg-muted rounded-tl-sm'
                       )}
                     >
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      <p className="whitespace-pre-wrap break-words">{message.content}</p>
                     </div>
                   </div>
                 ))}
@@ -328,7 +565,7 @@ export function FloatingAssistant() {
                       </AvatarFallback>
                     </Avatar>
                     <div className="max-w-[80%] bg-muted rounded-2xl rounded-tl-sm px-4 py-2 text-sm">
-                      <p className="whitespace-pre-wrap">{streamingContent}</p>
+                      <p className="whitespace-pre-wrap break-words">{streamingContent}</p>
                     </div>
                   </div>
                 )}
@@ -355,7 +592,7 @@ export function FloatingAssistant() {
           </ScrollArea>
 
           {/* Input */}
-          <div className="p-4 border-t bg-background">
+          <div className="p-4 border-t bg-background shrink-0">
             <form onSubmit={handleSubmit} className="flex gap-2">
               <input
                 type="file"
@@ -413,11 +650,16 @@ export function FloatingAssistant() {
                 <Send className="h-5 w-5" />
               </Button>
             </form>
+            
+            {/* Position hint */}
+            <p className="text-[10px] text-center text-muted-foreground mt-2 opacity-60">
+              Drag the button to reposition or right-click for options
+            </p>
           </div>
         </Card>
       </div>
 
-      {/* Backdrop */}
+      {/* Backdrop for expanded mode */}
       {isOpen && isExpanded && (
         <div
           className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm"

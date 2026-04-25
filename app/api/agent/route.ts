@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getOrCreateSession, saveMessage, updateSessionTitle, getSessionMessages } from '@/lib/db'
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
 
 const FARMING_SYSTEM_PROMPT = `You are an expert agentic AI farming assistant. You provide intelligent, step-by-step guidance for farmers.
 

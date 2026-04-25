@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { AppSidebar, MobileMenuButton } from '@/components/sidebar/app-sidebar'
+import { FloatingAssistant } from '@/components/ai-assistant/floating-assistant'
 import { cn } from '@/lib/utils'
 import { Leaf } from 'lucide-react'
 
@@ -56,6 +57,9 @@ export function MainLayout({ children }: MainLayoutProps) {
           {children}
         </main>
       </div>
+
+      {/* Floating AI Assistant - Accessible on all pages */}
+      <FloatingAssistant />
     </div>
   )
 }

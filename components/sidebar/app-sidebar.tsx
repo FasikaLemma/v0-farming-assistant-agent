@@ -5,16 +5,15 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
   Leaf,
-  MessageSquare,
   LayoutDashboard,
   History,
   Settings,
   ChevronLeft,
   ChevronRight,
-  Plus,
   Menu,
   Sprout,
   Sun,
@@ -22,22 +21,65 @@ import {
   Bug,
   TrendingUp,
   HelpCircle,
+  Activity,
+  Target,
+  CloudRain,
+  MessageSquare,
 } from 'lucide-react'
 import { useChatStore } from '@/lib/chat-store'
 
+// Main navigation - Dashboard first, Chat accessible via floating button
 const navigation = [
-  { name: 'Chat', href: '/', icon: MessageSquare },
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'History', href: '/history', icon: History },
-  { name: 'Help', href: '/help', icon: HelpCircle },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, description: 'Overview' },
+  { name: 'Chat', href: '/', icon: MessageSquare, description: 'AI Assistant' },
+  { name: 'History', href: '/history', icon: History, description: 'Past Chats' },
+  { name: 'Help', href: '/help', icon: HelpCircle, description: 'Support' },
 ]
 
+// Capabilities - organized by function
 const capabilities = [
-  { name: 'Soil Analysis', icon: Droplets, description: 'NPK, pH, moisture' },
-  { name: 'Crop Planning', icon: Sprout, description: 'Best matches for your soil' },
-  { name: 'Weather & Timing', icon: Sun, description: 'Optimal planting windows' },
-  { name: 'Disease Detection', icon: Bug, description: 'Image-based analysis' },
-  { name: 'Market Insights', icon: TrendingUp, description: 'Price trends & timing' },
+  { 
+    name: 'Crop Health', 
+    icon: Activity, 
+    description: 'Monitor crops',
+    href: '/dashboard?tab=crop-health',
+    color: 'text-chart-2'
+  },
+  { 
+    name: 'Soil & Fertility', 
+    icon: Droplets, 
+    description: 'NPK analysis',
+    href: '/dashboard?tab=soil',
+    color: 'text-primary'
+  },
+  { 
+    name: 'Crop Advice', 
+    icon: Target, 
+    description: 'Recommendations',
+    href: '/dashboard?tab=recommendations',
+    color: 'text-chart-4'
+  },
+  { 
+    name: 'Weather', 
+    icon: CloudRain, 
+    description: 'Forecasts',
+    href: '/dashboard?tab=weather',
+    color: 'text-chart-3'
+  },
+  { 
+    name: 'Market', 
+    icon: TrendingUp, 
+    description: 'Price insights',
+    href: '/dashboard?tab=market',
+    color: 'text-accent'
+  },
+]
+
+// Quick actions for farmers
+const quickActions = [
+  { name: 'Analyze Soil', icon: Droplets, href: '/?action=soil' },
+  { name: 'Detect Disease', icon: Bug, href: '/?action=disease' },
+  { name: 'Plan Crops', icon: Sprout, href: '/?action=crops' },
 ]
 
 interface AppSidebarProps {
@@ -80,21 +122,21 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
           {isOpen ? (
             <>
               <div className="flex items-center gap-2 flex-1">
-                <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
+                <div className="w-9 h-9 rounded-lg bg-sidebar-primary flex items-center justify-center">
                   <Leaf className="w-5 h-5 text-sidebar-primary-foreground" />
                 </div>
                 <div className="flex flex-col">
                   <span className="font-semibold text-sm">Farm AI</span>
-                  <span className="text-xs text-sidebar-foreground/60">Assistant</span>
+                  <span className="text-xs text-sidebar-foreground/60">Smart Farming</span>
                 </div>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
-                className="shrink-0 text-sidebar-foreground hover:bg-sidebar-accent"
+                className="shrink-0 text-sidebar-foreground hover:bg-sidebar-accent h-8 w-8"
                 onClick={onToggle}
               >
-                <ChevronLeft className="h-5 w-5" />
+                <ChevronLeft className="h-4 w-4" />
               </Button>
             </>
           ) : (
@@ -104,28 +146,19 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
               className="hidden lg:flex text-sidebar-foreground hover:bg-sidebar-accent"
               onClick={onToggle}
             >
-              <ChevronRight className="h-5 w-5" />
+              <ChevronRight className="h-4 w-4" />
             </Button>
           )}
         </div>
 
-        {/* New Chat Button */}
-        <div className={cn('p-3', !isOpen && 'hidden lg:flex lg:justify-center lg:p-2')}>
-          <Link href="/" className="w-full">
-            <Button
-              className={cn(
-                'gap-2 bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90',
-                isOpen ? 'w-full' : 'w-10 h-10 p-0'
-              )}
-            >
-              <Plus className="h-4 w-4" />
-              {isOpen && <span>New Chat</span>}
-            </Button>
-          </Link>
-        </div>
-
-        {/* Navigation */}
-        <nav className={cn('px-3 space-y-1', !isOpen && 'hidden lg:block lg:px-2')}>
+        {/* Main Navigation */}
+        <nav className={cn('px-3 py-4 space-y-1', !isOpen && 'hidden lg:block lg:px-2')}>
+          <p className={cn(
+            'text-xs font-medium text-sidebar-foreground/50 uppercase tracking-wider mb-2 px-2',
+            !isOpen && 'lg:hidden'
+          )}>
+            Navigation
+          </p>
           {navigation.map((item) => {
             const isActive = pathname === item.href
             return (
@@ -133,37 +166,72 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
                 <Button
                   variant="ghost"
                   className={cn(
-                    'w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-                    isActive && 'bg-sidebar-accent text-sidebar-accent-foreground',
-                    !isOpen && 'lg:justify-center lg:w-10 lg:h-10 lg:p-0 lg:mx-auto'
+                    'w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-11',
+                    isActive && 'bg-sidebar-accent text-sidebar-accent-foreground font-medium',
+                    !isOpen && 'lg:justify-center lg:w-12 lg:h-12 lg:p-0 lg:mx-auto'
                   )}
+                  title={!isOpen ? item.name : undefined}
                 >
-                  <item.icon className="h-5 w-5 shrink-0" />
-                  {isOpen && <span>{item.name}</span>}
+                  <item.icon className={cn('h-5 w-5 shrink-0', isActive && 'text-sidebar-primary')} />
+                  {isOpen && (
+                    <div className="flex flex-col items-start">
+                      <span className="text-sm">{item.name}</span>
+                      <span className="text-xs text-sidebar-foreground/50">{item.description}</span>
+                    </div>
+                  )}
                 </Button>
               </Link>
             )
           })}
         </nav>
 
-        {/* Capabilities */}
+        {/* Capabilities Section */}
+        {isOpen && (
+          <div className="px-3 mt-2">
+            <div className="flex items-center justify-between px-2 mb-2">
+              <p className="text-xs font-medium text-sidebar-foreground/50 uppercase tracking-wider">
+                Capabilities
+              </p>
+              <Badge variant="secondary" className="text-[10px] bg-sidebar-accent text-sidebar-accent-foreground">
+                5
+              </Badge>
+            </div>
+            <div className="space-y-0.5">
+              {capabilities.map((cap) => (
+                <Link key={cap.name} href={cap.href}>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 h-10 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  >
+                    <cap.icon className={cn('h-4 w-4 shrink-0', cap.color)} />
+                    <div className="flex-1 flex items-center justify-between min-w-0">
+                      <span className="text-sm truncate">{cap.name}</span>
+                      <span className="text-xs text-sidebar-foreground/40">{cap.description}</span>
+                    </div>
+                  </Button>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Quick Actions */}
         {isOpen && (
           <div className="px-3 mt-6">
-            <p className="text-xs font-medium text-sidebar-foreground/60 uppercase tracking-wider mb-2 px-2">
-              Capabilities
+            <p className="text-xs font-medium text-sidebar-foreground/50 uppercase tracking-wider mb-2 px-2">
+              Quick Actions
             </p>
-            <div className="space-y-1">
-              {capabilities.map((cap) => (
-                <div
-                  key={cap.name}
-                  className="flex items-center gap-3 px-2 py-2 rounded-lg text-sm text-sidebar-foreground/80"
-                >
-                  <cap.icon className="h-4 w-4 shrink-0 text-sidebar-primary" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{cap.name}</p>
-                    <p className="text-xs text-sidebar-foreground/50 truncate">{cap.description}</p>
-                  </div>
-                </div>
+            <div className="grid grid-cols-3 gap-2">
+              {quickActions.map((action) => (
+                <Link key={action.name} href={action.href}>
+                  <Button
+                    variant="outline"
+                    className="w-full h-auto py-3 flex-col gap-1.5 border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:border-sidebar-accent"
+                  >
+                    <action.icon className="h-5 w-5" />
+                    <span className="text-[10px] leading-tight text-center">{action.name}</span>
+                  </Button>
+                </Link>
               ))}
             </div>
           </div>
@@ -172,20 +240,27 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
         {/* Recent Chats */}
         {isOpen && sessions.length > 0 && (
           <div className="flex-1 flex flex-col min-h-0 mt-6">
-            <p className="text-xs font-medium text-sidebar-foreground/60 uppercase tracking-wider mb-2 px-5">
-              Recent Chats
-            </p>
+            <div className="flex items-center justify-between px-5 mb-2">
+              <p className="text-xs font-medium text-sidebar-foreground/50 uppercase tracking-wider">
+                Recent Chats
+              </p>
+              <Link href="/history">
+                <Button variant="ghost" size="sm" className="h-6 text-xs text-sidebar-foreground/50 hover:text-sidebar-foreground p-0">
+                  View All
+                </Button>
+              </Link>
+            </div>
             <ScrollArea className="flex-1 px-3">
-              <div className="space-y-1">
-                {sessions.slice(0, 10).map((session) => (
+              <div className="space-y-0.5">
+                {sessions.slice(0, 5).map((session) => (
                   <button
                     key={session.id}
-                    className="flex items-center gap-3 w-full px-2 py-2 rounded-lg text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors text-left"
+                    className="flex items-center gap-3 w-full px-2 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors text-left"
                   >
-                    <History className="h-4 w-4 shrink-0" />
+                    <MessageSquare className="h-4 w-4 shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="truncate">{session.title}</p>
-                      <p className="text-xs text-sidebar-foreground/50">
+                      <p className="truncate text-sm">{session.title}</p>
+                      <p className="text-[10px] text-sidebar-foreground/40">
                         {new Date(session.updated_at).toLocaleDateString()}
                       </p>
                     </div>
@@ -204,7 +279,7 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
           <Button
             variant="ghost"
             className={cn(
-              'w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+              'w-full justify-start gap-3 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
               !isOpen && 'lg:justify-center lg:w-10 lg:h-10 lg:p-0'
             )}
           >

@@ -1,5 +1,12 @@
 import { streamText, convertToModelMessages, UIMessage } from 'ai'
+import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createClient } from '@/lib/supabase/server'
+
+// Initialize Google Gemini with API key from environment - Direct API access (no gateway)
+const google = createGoogleGenerativeAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  baseURL: 'https://generativelanguage.googleapis.com/v1beta',
+})
 
 export const maxDuration = 30
 
@@ -103,9 +110,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // Stream the response using Vercel AI SDK
+    // Stream the response using Vercel AI SDK with Google Gemini
     const result = streamText({
-      model: 'openai/gpt-4o-mini',
+      model: google('gemini-2.0-flash'),
       system: FARMING_SYSTEM_PROMPT,
       messages: await convertToModelMessages(messages),
       maxOutputTokens: 2048,

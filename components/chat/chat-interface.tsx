@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -142,30 +143,70 @@ function formatMessage(content: string): React.ReactNode {
   )
 }
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  initialSessionId?: string | null
+}
+
+export function ChatInterface({ initialSessionId }: ChatInterfaceProps) {
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string>('')
   const [streamingContent, setStreamingContent] = useState<string>('')
   
+  const router = useRouter()
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Initialize session ID on mount
+  // Initialize session ID and load messages if session is provided
   useEffect(() => {
-    const storedSessionId = sessionStorage.getItem('currentSessionId')
-    if (storedSessionId) {
-      setSessionId(storedSessionId)
+    if (initialSessionId) {
+      // Load existing session from URL parameter
+      setSessionId(initialSessionId)
+      sessionStorage.setItem('currentSessionId', initialSessionId)
+      loadSessionMessages(initialSessionId)
     } else {
-      const newSessionId = generateSessionId()
-      setSessionId(newSessionId)
-      sessionStorage.setItem('currentSessionId', newSessionId)
+      // Check for stored session or create new one
+      const storedSessionId = sessionStorage.getItem('currentSessionId')
+      if (storedSessionId) {
+        setSessionId(storedSessionId)
+      } else {
+        const newSessionId = generateSessionId()
+        setSessionId(newSessionId)
+        sessionStorage.setItem('currentSessionId', newSessionId)
+      }
     }
-  }, [])
+  }, [initialSessionId])
+
+  // Load messages for a specific session
+  const loadSessionMessages = async (sid: string) => {
+    setIsLoadingHistory(true)
+    try {
+      const response = await fetch(`/api/messages?sessionId=${sid}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.messages && data.messages.length > 0) {
+          // Convert database messages to our Message format
+          const loadedMessages: Message[] = data.messages
+            .filter((m: { role: string }) => m.role !== 'system')
+            .map((m: { id: string; role: string; content: string }) => ({
+              id: m.id,
+              role: m.role as 'user' | 'assistant',
+              content: m.content
+            }))
+          setMessages(loadedMessages)
+        }
+      }
+    } catch (err) {
+      console.error('Error loading session messages:', err)
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -318,6 +359,8 @@ export function ChatInterface() {
     setMessages([])
     setStreamingContent('')
     setError(null)
+    // Clear URL parameter
+    router.push('/', { scroll: false })
   }
 
   return (
@@ -325,7 +368,14 @@ export function ChatInterface() {
       {/* Messages Area */}
       <ScrollArea className="flex-1 px-4">
         <div className="max-w-3xl mx-auto py-6 space-y-6">
-          {messages.length === 0 && !streamingContent ? (
+          {isLoadingHistory ? (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center animate-pulse">
+                <Leaf className="w-8 h-8 text-primary" />
+              </div>
+              <p className="text-muted-foreground">Loading conversation...</p>
+            </div>
+          ) : messages.length === 0 && !streamingContent ? (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
               <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
                 <Leaf className="w-10 h-10 text-primary" />

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, Suspense } from 'react'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -30,10 +31,17 @@ import {
   Sparkles,
   Target,
   BarChart3,
-  Thermometer,
   Gauge,
 } from 'lucide-react'
 import Link from 'next/link'
+
+// Valid tab values
+const VALID_TABS = ['overview', 'crop-health', 'soil', 'recommendations', 'weather', 'market'] as const
+type TabValue = typeof VALID_TABS[number]
+
+function isValidTab(tab: string | null): tab is TabValue {
+  return tab !== null && VALID_TABS.includes(tab as TabValue)
+}
 
 // Mock data
 const soilHealth = {
@@ -84,8 +92,56 @@ const recentAlerts = [
   { type: 'info', message: 'Wheat prices up 5% this week', time: '1d ago' },
 ]
 
+// Main dashboard export with Suspense boundary
 export default function DashboardPage() {
-  const [activeTab, setActiveTab] = useState('overview')
+  return (
+    <Suspense fallback={<DashboardSkeleton />}>
+      <DashboardContent />
+    </Suspense>
+  )
+}
+
+// Loading skeleton
+function DashboardSkeleton() {
+  return (
+    <div className="h-full overflow-auto">
+      <div className="container mx-auto p-4 md:p-6 space-y-6 max-w-7xl">
+        <div className="animate-pulse space-y-6">
+          <div className="h-8 bg-muted rounded w-48" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-24 bg-muted rounded-lg" />
+            ))}
+          </div>
+          <div className="h-12 bg-muted rounded-lg" />
+          <div className="h-64 bg-muted rounded-lg" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Dashboard content with URL-based tab routing
+function DashboardContent() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  
+  // Get current tab from URL, default to 'overview'
+  const tabParam = searchParams.get('tab')
+  const activeTab = isValidTab(tabParam) ? tabParam : 'overview'
+  
+  // Function to change tabs and update URL
+  const setActiveTab = useCallback((newTab: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (newTab === 'overview') {
+      params.delete('tab') // Remove tab param for default overview
+    } else {
+      params.set('tab', newTab)
+    }
+    const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname
+    router.push(newUrl, { scroll: false })
+  }, [searchParams, pathname, router])
 
   return (
     <div className="h-full overflow-auto">

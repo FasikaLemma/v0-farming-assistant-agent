@@ -1,8 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useMemo } from 'react'
-import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport } from 'ai'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
@@ -23,20 +21,21 @@ import {
   ImagePlus,
 } from 'lucide-react'
 
+interface Message {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+}
+
 const quickSuggestions = [
-  { label: 'Analyze my soil', color: 'bg-primary/20 hover:bg-primary/30 text-primary' },
-  { label: 'Best crops for spring', color: 'bg-chart-2/20 hover:bg-chart-2/30 text-chart-2' },
-  { label: 'Detect plant disease', color: 'bg-destructive/20 hover:bg-destructive/30 text-destructive' },
-  { label: 'Market prices today', color: 'bg-accent/20 hover:bg-accent/30 text-accent-foreground' },
+  { label: 'Analyze my soil', prompt: 'Help me analyze my soil composition', color: 'bg-primary/20 hover:bg-primary/30 text-primary' },
+  { label: 'Best crops for spring', prompt: 'What crops should I plant this spring?', color: 'bg-chart-2/20 hover:bg-chart-2/30 text-chart-2' },
+  { label: 'Detect plant disease', prompt: 'My plants look sick, can you help identify the disease?', color: 'bg-destructive/20 hover:bg-destructive/30 text-destructive' },
+  { label: 'Market prices today', prompt: 'What are current market prices for crops?', color: 'bg-accent/20 hover:bg-accent/30 text-accent-foreground' },
 ]
 
-// Helper to extract text from UIMessage parts
-function getMessageText(message: { parts?: Array<{ type: string; text?: string }> }): string {
-  if (!message.parts || !Array.isArray(message.parts)) return ''
-  return message.parts
-    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-    .map((p) => p.text)
-    .join('')
+function generateId(): string {
+  return `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 }
 
 export function FloatingAssistant() {
@@ -44,33 +43,18 @@ export function FloatingAssistant() {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [input, setInput] = useState('')
-  const [sessionId] = useState(() => `floating-${Date.now()}`)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [streamingContent, setStreamingContent] = useState('')
+  
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
 
-  // Create transport for chat API
-  const transport = useMemo(() => {
-    return new DefaultChatTransport({
-      api: '/api/chat',
-      headers: { 'Content-Type': 'application/json' },
-      prepareSendMessagesRequest: ({ messages }) => ({
-        body: { messages, sessionId },
-      }),
-    })
-  }, [sessionId])
-
-  const { messages, sendMessage, status } = useChat({
-    transport,
-    id: sessionId,
-  })
-
-  const isLoading = status === 'streaming' || status === 'submitted'
-
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, status])
+  }, [messages, streamingContent])
 
   // Initialize speech recognition
   useEffect(() => {
@@ -106,16 +90,94 @@ export function FloatingAssistant() {
     }
   }
 
+  const sendMessage = useCallback(async (content: string) => {
+    if (!content.trim() || isLoading) return
+
+    setIsLoading(true)
+    setStreamingContent('')
+
+    const userMessage: Message = {
+      id: generateId(),
+      role: 'user',
+      content: content.trim()
+    }
+    
+    setMessages(prev => [...prev, userMessage])
+
+    try {
+      const apiMessages = [...messages, userMessage].map(m => ({
+        id: m.id,
+        role: m.role,
+        parts: [{ type: 'text', text: m.content }]
+      }))
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: apiMessages })
+      })
+
+      if (!response.ok) throw new Error('Failed to get response')
+
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('No response body')
+
+      const decoder = new TextDecoder()
+      let assistantContent = ''
+      let assistantId = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim()
+            if (data === '[DONE]') continue
+
+            try {
+              const parsed = JSON.parse(data)
+              if (parsed.type === 'message-start') {
+                assistantId = parsed.id
+              } else if (parsed.type === 'text-delta') {
+                assistantContent += parsed.delta
+                setStreamingContent(assistantContent)
+              }
+            } catch {
+              // Skip invalid JSON
+            }
+          }
+        }
+      }
+
+      if (assistantContent) {
+        setMessages(prev => [...prev, {
+          id: assistantId || generateId(),
+          role: 'assistant',
+          content: assistantContent
+        }])
+        setStreamingContent('')
+      }
+    } catch (err) {
+      console.error('Chat error:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [messages, isLoading])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() || isLoading) return
-    sendMessage({ text: input.trim() })
+    sendMessage(input.trim())
     setInput('')
   }
 
-  const handleSuggestionClick = (suggestion: string) => {
+  const handleSuggestionClick = (prompt: string) => {
     if (isLoading) return
-    sendMessage({ text: suggestion })
+    sendMessage(prompt)
   }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -124,7 +186,7 @@ export function FloatingAssistant() {
 
     const reader = new FileReader()
     reader.onloadend = () => {
-      sendMessage({ text: 'Please analyze this plant/soil image for any issues or diseases.' })
+      sendMessage('[Image attached for analysis]\n\nPlease analyze this plant/soil image for any issues or diseases.')
     }
     reader.readAsDataURL(file)
   }
@@ -196,7 +258,7 @@ export function FloatingAssistant() {
 
           {/* Messages */}
           <ScrollArea className="flex-1 p-4">
-            {messages.length === 0 ? (
+            {messages.length === 0 && !streamingContent ? (
               <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
                   <Sparkles className="w-8 h-8 text-primary" />
@@ -216,7 +278,7 @@ export function FloatingAssistant() {
                         suggestion.color,
                         isLoading && "opacity-50 cursor-not-allowed"
                       )}
-                      onClick={() => handleSuggestionClick(suggestion.label)}
+                      onClick={() => handleSuggestionClick(suggestion.prompt)}
                     >
                       {suggestion.label}
                     </Badge>
@@ -252,11 +314,26 @@ export function FloatingAssistant() {
                           : 'bg-muted rounded-tl-sm'
                       )}
                     >
-                      <p className="whitespace-pre-wrap">{getMessageText(message)}</p>
+                      <p className="whitespace-pre-wrap">{message.content}</p>
                     </div>
                   </div>
                 ))}
-                {isLoading && (
+
+                {/* Streaming content */}
+                {streamingContent && (
+                  <div className="flex gap-3">
+                    <Avatar className="w-8 h-8 shrink-0">
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        <Leaf className="w-4 h-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="max-w-[80%] bg-muted rounded-2xl rounded-tl-sm px-4 py-2 text-sm">
+                      <p className="whitespace-pre-wrap">{streamingContent}</p>
+                    </div>
+                  </div>
+                )}
+
+                {isLoading && !streamingContent && (
                   <div className="flex gap-3">
                     <Avatar className="w-8 h-8 shrink-0">
                       <AvatarFallback className="bg-primary text-primary-foreground">

@@ -1,8 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useMemo } from 'react'
-import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport } from 'ai'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -11,7 +9,6 @@ import {
   Send,
   HelpCircle,
   User,
-  Lightbulb,
   ThumbsUp,
   ThumbsDown,
   Sparkles,
@@ -20,6 +17,12 @@ import { cn } from '@/lib/utils'
 
 interface HelpChatProps {
   className?: string
+}
+
+interface Message {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
 }
 
 const suggestedQuestions = [
@@ -45,13 +48,8 @@ const suggestedQuestions = [
   },
 ]
 
-// Helper to extract text from UIMessage parts
-function getMessageText(message: { parts?: Array<{ type: string; text?: string }> }): string {
-  if (!message.parts || !Array.isArray(message.parts)) return ''
-  return message.parts
-    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-    .map((p) => p.text)
-    .join('')
+function generateId(): string {
+  return `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 }
 
 function formatHelpMessage(content: string): React.ReactNode {
@@ -112,34 +110,19 @@ function formatHelpMessage(content: string): React.ReactNode {
 
 export function HelpChat({ className }: HelpChatProps) {
   const [input, setInput] = useState('')
-  const [sessionId] = useState(() => `help_${Date.now()}`)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [streamingContent, setStreamingContent] = useState('')
   const [feedbackGiven, setFeedbackGiven] = useState<Set<string>>(new Set())
+  
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Create transport for chat API
-  const transport = useMemo(() => {
-    return new DefaultChatTransport({
-      api: '/api/chat',
-      headers: { 'Content-Type': 'application/json' },
-      prepareSendMessagesRequest: ({ messages }) => ({
-        body: { messages, sessionId },
-      }),
-    })
-  }, [sessionId])
-
-  const { messages, sendMessage, status } = useChat({
-    transport,
-    id: sessionId,
-  })
-
-  const isLoading = status === 'streaming' || status === 'submitted'
-
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, status])
+  }, [messages, streamingContent])
 
   // Auto-resize textarea
   useEffect(() => {
@@ -149,12 +132,89 @@ export function HelpChat({ className }: HelpChatProps) {
     }
   }, [input])
 
+  const sendMessage = useCallback(async (content: string) => {
+    if (!content.trim() || isLoading) return
+
+    setIsLoading(true)
+    setStreamingContent('')
+
+    const userMessage: Message = {
+      id: generateId(),
+      role: 'user',
+      content: content.trim()
+    }
+    
+    setMessages(prev => [...prev, userMessage])
+
+    try {
+      const apiMessages = [...messages, userMessage].map(m => ({
+        id: m.id,
+        role: m.role,
+        parts: [{ type: 'text', text: m.content }]
+      }))
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: apiMessages })
+      })
+
+      if (!response.ok) throw new Error('Failed to get response')
+
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('No response body')
+
+      const decoder = new TextDecoder()
+      let assistantContent = ''
+      let assistantId = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim()
+            if (data === '[DONE]') continue
+
+            try {
+              const parsed = JSON.parse(data)
+              if (parsed.type === 'message-start') {
+                assistantId = parsed.id
+              } else if (parsed.type === 'text-delta') {
+                assistantContent += parsed.delta
+                setStreamingContent(assistantContent)
+              }
+            } catch {
+              // Skip invalid JSON
+            }
+          }
+        }
+      }
+
+      if (assistantContent) {
+        setMessages(prev => [...prev, {
+          id: assistantId || generateId(),
+          role: 'assistant',
+          content: assistantContent
+        }])
+        setStreamingContent('')
+      }
+    } catch (err) {
+      console.error('Chat error:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [messages, isLoading])
+
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault()
     if (!input.trim() || isLoading) return
-    sendMessage({ text: input.trim() })
+    sendMessage(input.trim())
     setInput('')
-    // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
     }
@@ -162,7 +222,7 @@ export function HelpChat({ className }: HelpChatProps) {
 
   const handleSuggestion = (question: string) => {
     if (isLoading) return
-    sendMessage({ text: question })
+    sendMessage(question)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -196,7 +256,7 @@ export function HelpChat({ className }: HelpChatProps) {
       {/* Messages Area - Scrollable */}
       <div className="flex-1 overflow-y-auto" ref={scrollRef}>
         <div className="p-4 space-y-4">
-          {messages.length === 0 ? (
+          {messages.length === 0 && !streamingContent ? (
             /* Empty State with Suggestions */
             <div className="space-y-6 py-4">
               <div className="text-center">
@@ -260,12 +320,12 @@ export function HelpChat({ className }: HelpChatProps) {
                     )}
                   >
                     {message.role === 'user' ? (
-                      <p className="text-sm break-words">{getMessageText(message)}</p>
+                      <p className="text-sm break-words">{message.content}</p>
                     ) : (
                       <div className="space-y-3">
                         <Card className="border-0 shadow-sm bg-muted/50">
                           <CardContent className="p-4">
-                            {formatHelpMessage(getMessageText(message))}
+                            {formatHelpMessage(message.content)}
                           </CardContent>
                         </Card>
                         {/* Feedback buttons */}
@@ -309,8 +369,26 @@ export function HelpChat({ className }: HelpChatProps) {
                 </div>
               ))}
 
+              {/* Streaming content */}
+              {streamingContent && (
+                <div className="flex gap-3 justify-start">
+                  <Avatar className="w-8 h-8 shrink-0 mt-1">
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      <Sparkles className="w-4 h-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <Card className="border-0 shadow-sm bg-muted/50">
+                      <CardContent className="p-4">
+                        {formatHelpMessage(streamingContent)}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              )}
+
               {/* Typing Indicator */}
-              {isLoading && (
+              {isLoading && !streamingContent && (
                 <div className="flex gap-3 justify-start">
                   <Avatar className="w-8 h-8 shrink-0">
                     <AvatarFallback className="bg-primary text-primary-foreground">
@@ -358,7 +436,7 @@ export function HelpChat({ className }: HelpChatProps) {
           </Button>
         </form>
         <p className="text-xs text-muted-foreground text-center mt-3">
-          Press Enter to send, Shift+Enter for new line
+          Free AI assistant - no API key required
         </p>
       </div>
     </div>

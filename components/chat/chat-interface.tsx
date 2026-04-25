@@ -1,8 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useMemo } from 'react'
-import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport } from 'ai'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -21,6 +19,12 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+
+interface Message {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+}
 
 const quickActions = [
   { 
@@ -55,17 +59,12 @@ const quickActions = [
   },
 ]
 
-function generateSessionId(): string {
-  return `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+function generateId(): string {
+  return `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 }
 
-// Helper to extract text from UIMessage parts
-function getMessageText(message: { parts?: Array<{ type: string; text?: string }> }): string {
-  if (!message.parts || !Array.isArray(message.parts)) return ''
-  return message.parts
-    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-    .map((p) => p.text)
-    .join('')
+function generateSessionId(): string {
+  return `session_${generateId()}`
 }
 
 function formatMessage(content: string): React.ReactNode {
@@ -74,7 +73,7 @@ function formatMessage(content: string): React.ReactNode {
   return (
     <div className="space-y-2">
       {lines.map((line, index) => {
-        // Headers with emoji - make them stand out
+        // Headers with emoji
         if (line.match(/^[📊🌱➡️💡🔍✅⚠️]/)) {
           const isBold = line.includes('**')
           const cleanLine = line.replace(/\*\*/g, '')
@@ -118,6 +117,15 @@ function formatMessage(content: string): React.ReactNode {
           )
         }
         
+        // Table rows
+        if (line.startsWith('|')) {
+          return (
+            <p key={index} className="text-sm font-mono text-xs">
+              {line}
+            </p>
+          )
+        }
+        
         // Empty lines
         if (line.trim() === '') {
           return <div key={index} className="h-2" />
@@ -136,8 +144,13 @@ function formatMessage(content: string): React.ReactNode {
 
 export function ChatInterface() {
   const [input, setInput] = useState('')
+  const [messages, setMessages] = useState<Message[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string>('')
+  const [streamingContent, setStreamingContent] = useState<string>('')
+  
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -154,35 +167,12 @@ export function ChatInterface() {
     }
   }, [])
 
-  // Create transport with session ID
-  const transport = useMemo(() => {
-    return new DefaultChatTransport({
-      api: '/api/chat',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      prepareSendMessagesRequest: ({ messages }) => ({
-        body: {
-          messages,
-          sessionId,
-        },
-      }),
-    })
-  }, [sessionId])
-
-  const { messages, sendMessage, status, error } = useChat({
-    transport,
-    id: sessionId,
-  })
-
-  const isLoading = status === 'streaming' || status === 'submitted'
-
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [messages, status])
+  }, [messages, streamingContent])
 
   // Auto-resize textarea
   useEffect(() => {
@@ -192,6 +182,95 @@ export function ChatInterface() {
     }
   }, [input])
 
+  const sendMessage = useCallback(async (content: string) => {
+    if (!content.trim() || isLoading) return
+
+    setError(null)
+    setIsLoading(true)
+    setStreamingContent('')
+
+    // Add user message
+    const userMessage: Message = {
+      id: generateId(),
+      role: 'user',
+      content: content.trim()
+    }
+    
+    setMessages(prev => [...prev, userMessage])
+
+    try {
+      // Prepare messages for API (convert to parts format)
+      const apiMessages = [...messages, userMessage].map(m => ({
+        id: m.id,
+        role: m.role,
+        parts: [{ type: 'text', text: m.content }]
+      }))
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: apiMessages,
+          sessionId
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to get response')
+      }
+
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('No response body')
+
+      const decoder = new TextDecoder()
+      let assistantContent = ''
+      let assistantId = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim()
+            if (data === '[DONE]') continue
+
+            try {
+              const parsed = JSON.parse(data)
+              
+              if (parsed.type === 'message-start') {
+                assistantId = parsed.id
+              } else if (parsed.type === 'text-delta') {
+                assistantContent += parsed.delta
+                setStreamingContent(assistantContent)
+              }
+            } catch {
+              // Skip invalid JSON
+            }
+          }
+        }
+      }
+
+      // Add completed assistant message
+      if (assistantContent) {
+        setMessages(prev => [...prev, {
+          id: assistantId || generateId(),
+          role: 'assistant',
+          content: assistantContent
+        }])
+        setStreamingContent('')
+      }
+    } catch (err) {
+      console.error('Chat error:', err)
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [messages, sessionId, isLoading])
+
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault()
     if (!input.trim() || isLoading) return
@@ -200,20 +279,21 @@ export function ChatInterface() {
       ? `[Image attached for analysis]\n\n${input.trim()}`
       : input.trim()
 
-    sendMessage({ text: messageText })
+    await sendMessage(messageText)
     setInput('')
     setUploadedImage(null)
   }
 
   const handleQuickAction = (prompt: string) => {
     if (isLoading) return
-    sendMessage({ text: prompt })
+    sendMessage(prompt)
   }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
+        setError('Image too large. Max 10MB.')
         return
       }
       const reader = new FileReader()
@@ -235,7 +315,9 @@ export function ChatInterface() {
     const newSessionId = generateSessionId()
     setSessionId(newSessionId)
     sessionStorage.setItem('currentSessionId', newSessionId)
-    window.location.reload()
+    setMessages([])
+    setStreamingContent('')
+    setError(null)
   }
 
   return (
@@ -243,7 +325,7 @@ export function ChatInterface() {
       {/* Messages Area */}
       <ScrollArea className="flex-1 px-4">
         <div className="max-w-3xl mx-auto py-6 space-y-6">
-          {messages.length === 0 ? (
+          {messages.length === 0 && !streamingContent ? (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
               <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
                 <Leaf className="w-10 h-10 text-primary" />
@@ -316,11 +398,11 @@ export function ChatInterface() {
                     )}
                   >
                     {message.role === 'user' ? (
-                      <p className="text-sm whitespace-pre-wrap">{getMessageText(message)}</p>
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                     ) : (
                       <Card className="border-0 shadow-sm bg-muted/50">
                         <CardContent className="p-4">
-                          {formatMessage(getMessageText(message))}
+                          {formatMessage(message.content)}
                         </CardContent>
                       </Card>
                     )}
@@ -335,20 +417,26 @@ export function ChatInterface() {
                 </div>
               ))}
 
-              {/* Need Help Button */}
-              {messages.length > 0 && messages[messages.length - 1]?.role === 'assistant' && !isLoading && (
-                <div className="flex justify-center pt-2">
-                  <Link href="/help">
-                    <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground hover:bg-primary/10">
-                      <HelpCircle className="h-4 w-4" />
-                      Need help understanding this?
-                    </Button>
-                  </Link>
+              {/* Streaming content */}
+              {streamingContent && (
+                <div className="flex gap-4 justify-start">
+                  <Avatar className="w-8 h-8 shrink-0">
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      <Leaf className="w-4 h-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <Card className="border-0 shadow-sm bg-muted/50">
+                      <CardContent className="p-4">
+                        {formatMessage(streamingContent)}
+                      </CardContent>
+                    </Card>
+                  </div>
                 </div>
               )}
 
-              {/* Streaming indicator */}
-              {isLoading && (
+              {/* Loading indicator */}
+              {isLoading && !streamingContent && (
                 <div className="flex gap-4 justify-start">
                   <Avatar className="w-8 h-8 shrink-0">
                     <AvatarFallback className="bg-primary text-primary-foreground">
@@ -361,8 +449,20 @@ export function ChatInterface() {
                       <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                       <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                     </div>
-                    <span className="text-sm ml-2">Analyzing and thinking...</span>
+                    <span className="text-sm ml-2">Analyzing...</span>
                   </div>
+                </div>
+              )}
+
+              {/* Need Help Button */}
+              {messages.length > 0 && messages[messages.length - 1]?.role === 'assistant' && !isLoading && (
+                <div className="flex justify-center pt-2">
+                  <Link href="/help">
+                    <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground hover:bg-primary/10">
+                      <HelpCircle className="h-4 w-4" />
+                      Need help understanding this?
+                    </Button>
+                  </Link>
                 </div>
               )}
 
@@ -376,7 +476,7 @@ export function ChatInterface() {
                   </Avatar>
                   <Card className="border-destructive/50 bg-destructive/10">
                     <CardContent className="p-4">
-                      <p className="text-sm text-destructive">{error.message || 'An error occurred. Please try again.'}</p>
+                      <p className="text-sm text-destructive">{error}</p>
                     </CardContent>
                   </Card>
                 </div>
@@ -450,7 +550,7 @@ export function ChatInterface() {
             </Button>
           </form>
           <p className="text-xs text-muted-foreground text-center mt-3">
-            Powered by Vercel AI SDK. Always verify recommendations with local experts.
+            Free AI farming assistant. No API key required.
           </p>
         </div>
       </div>

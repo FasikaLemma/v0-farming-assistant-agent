@@ -1,46 +1,17 @@
-import { streamText, convertToModelMessages, UIMessage } from 'ai'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { UIMessage } from 'ai'
 import { createClient } from '@/lib/supabase/server'
-
-// Initialize Google Gemini with API key from environment - Direct API access (no gateway)
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  baseURL: 'https://generativelanguage.googleapis.com/v1beta',
-})
+import { streamMockResponse } from '@/lib/mock-ai'
 
 export const maxDuration = 30
 
-const FARMING_SYSTEM_PROMPT = `You are an expert agentic AI farming assistant. You provide intelligent, step-by-step guidance for farmers.
-
-Your capabilities:
-1. **Soil Analysis**: Analyze soil composition (N, P, K, pH, moisture) and provide insights
-2. **Crop Recommendations**: Suggest optimal crops based on soil, climate, and season
-3. **Fertilizer Guidance**: Recommend organic and synthetic fertilizers based on deficiencies
-4. **Planting Timing**: Advise on optimal planting and harvest windows based on weather
-5. **Disease Detection**: Analyze plant/soil descriptions to identify diseases or issues
-6. **Market Intelligence**: Provide insights on crop prices and best selling times
-
-Your behavior:
-- Always respond with structured, actionable advice
-- Break down complex problems into steps
-- Explain your reasoning clearly
-- Proactively suggest next actions
-- Use simple language that farmers can understand
-
-Response format - ALWAYS structure your responses with these exact headers:
-
-📊 **Analysis**
-[Your observation or understanding from the input]
-
-🌱 **Recommendation**
-[Your specific advice or suggestions]
-
-➡️ **Next Steps**
-[What the farmer should do next]
-
-If the user provides soil data, analyze it and recommend crops.
-If they ask about a crop, suggest fertilizers and planting timing.
-Always maintain context from previous messages in the conversation.`
+// Helper to extract text from UIMessage parts
+function getMessageText(message: UIMessage): string {
+  if (!message.parts || !Array.isArray(message.parts)) return ''
+  return message.parts
+    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+    .map((p) => p.text)
+    .join('')
+}
 
 export async function POST(req: Request) {
   try {
@@ -54,7 +25,7 @@ export async function POST(req: Request) {
       })
     }
 
-    // Save message to database if sessionId is provided
+    // Save user message to database if sessionId is provided
     if (sessionId) {
       try {
         const supabase = await createClient()
@@ -77,11 +48,7 @@ export async function POST(req: Request) {
         // Get the latest user message content
         const latestMessage = messages[messages.length - 1]
         if (latestMessage) {
-          // Extract text from parts
-          const content = latestMessage.parts
-            ?.filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-            .map((p) => p.text)
-            .join('') || ''
+          const content = getMessageText(latestMessage)
 
           if (content) {
             await supabase.from('chat_messages').insert({
@@ -110,44 +77,73 @@ export async function POST(req: Request) {
       }
     }
 
-    // Stream the response using Vercel AI SDK with Google Gemini
-    const result = streamText({
-      model: google('gemini-2.0-flash'),
-      system: FARMING_SYSTEM_PROMPT,
-      messages: await convertToModelMessages(messages),
-      maxOutputTokens: 2048,
-      temperature: 0.7,
-      abortSignal: req.signal,
+    // Convert UIMessages to simple format for mock AI
+    const simpleMessages = messages.map(m => ({
+      role: m.role,
+      content: getMessageText(m)
+    }))
+
+    // Create a streaming response using the mock AI
+    const encoder = new TextEncoder()
+    let fullResponse = ''
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          // Generate unique message ID
+          const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+          
+          // Send start event
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+            type: 'message-start',
+            id: messageId,
+            role: 'assistant'
+          })}\n\n`))
+
+          // Stream the response
+          for await (const chunk of streamMockResponse(simpleMessages)) {
+            fullResponse += chunk
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+              type: 'text-delta',
+              delta: chunk
+            })}\n\n`))
+          }
+
+          // Send finish event
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+            type: 'message-end',
+            finishReason: 'stop'
+          })}\n\n`))
+
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+          
+          // Save assistant response to database
+          if (sessionId && fullResponse) {
+            try {
+              const supabase = await createClient()
+              await supabase.from('chat_messages').insert({
+                session_id: sessionId,
+                role: 'assistant',
+                content: fullResponse,
+              })
+            } catch (dbError) {
+              console.error('Database error saving assistant message:', dbError)
+            }
+          }
+
+          controller.close()
+        } catch (error) {
+          console.error('Streaming error:', error)
+          controller.error(error)
+        }
+      }
     })
 
-    // Return streaming response
-    return result.toUIMessageStreamResponse({
-      originalMessages: messages,
-      onFinish: async ({ messages: allMessages }) => {
-        // Save assistant response to database
-        if (sessionId && allMessages.length > 0) {
-          try {
-            const supabase = await createClient()
-            const lastMessage = allMessages[allMessages.length - 1]
-            
-            if (lastMessage && lastMessage.role === 'assistant') {
-              const content = lastMessage.parts
-                ?.filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-                .map((p) => p.text)
-                .join('') || ''
-
-              if (content) {
-                await supabase.from('chat_messages').insert({
-                  session_id: sessionId,
-                  role: 'assistant',
-                  content,
-                })
-              }
-            }
-          } catch (dbError) {
-            console.error('Database error saving assistant message:', dbError)
-          }
-        }
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
       },
     })
   } catch (error) {

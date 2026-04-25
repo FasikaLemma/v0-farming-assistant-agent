@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -16,7 +16,6 @@ import {
   ChevronRight,
   Plus,
   Menu,
-  X,
   Sprout,
   Sun,
   Droplets,
@@ -48,7 +47,12 @@ interface AppSidebarProps {
 
 export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
   const pathname = usePathname()
-  const { sessions } = useChatStore()
+  const { sessions, fetchSessions } = useChatStore()
+
+  // Fetch sessions on mount
+  useEffect(() => {
+    fetchSessions('farming')
+  }, [fetchSessions])
 
   return (
     <>
@@ -182,7 +186,7 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
                     <div className="flex-1 min-w-0">
                       <p className="truncate">{session.title}</p>
                       <p className="text-xs text-sidebar-foreground/50">
-                        {new Date(session.timestamp).toLocaleDateString()}
+                        {new Date(session.updated_at).toLocaleDateString()}
                       </p>
                     </div>
                   </button>

@@ -1,13 +1,12 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport } from 'ai'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Spinner } from '@/components/ui/spinner'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Send,
   ImagePlus,
@@ -16,21 +15,14 @@ import {
   Leaf,
   X,
   HelpCircle,
+  AlertCircle,
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import {
-  SoilAnalysisCard,
-  CropRecommendationCard,
-  FertilizerCard,
-  PlantingTimingCard,
-  DiseaseDetectionCard,
-  MarketInsightsCard,
-} from './tool-cards'
-import type { FarmingAgentMessage } from '@/app/api/chat/route'
+import { useChatStore } from '@/lib/chat-store'
 
 const quickActions = [
-  { label: 'Analyze my soil', prompt: 'I want to analyze my soil. I have N: 35, P: 20, K: 40, pH: 6.5, and moisture: 45%.' },
+  { label: 'Analyze my soil', prompt: 'I want to analyze my soil. I have N: 35 mg/kg, P: 20 mg/kg, K: 40 mg/kg, pH: 6.5, and moisture: 45%.' },
   { label: 'Recommend crops', prompt: 'What crops should I plant this spring in California with neutral soil and optimal moisture?' },
   { label: 'Check planting time', prompt: 'When should I plant tomatoes in Texas?' },
   { label: 'Fertilizer advice', prompt: 'My soil is low in nitrogen and phosphorus. What fertilizers do you recommend for growing corn? I prefer organic options.' },
@@ -38,18 +30,95 @@ const quickActions = [
   { label: 'Disease help', prompt: 'My tomato plants have yellow leaves with brown spots. Can you help identify the disease?' },
 ]
 
+function generateSessionId(): string {
+  return `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+}
+
+function formatMessage(content: string): React.ReactNode {
+  // Parse markdown-like formatting
+  const lines = content.split('\n')
+  
+  return (
+    <div className="space-y-2">
+      {lines.map((line, index) => {
+        // Headers with emoji
+        if (line.match(/^[📊🌱➡️💡🔍✅⚠️]/)) {
+          const isBold = line.includes('**')
+          const cleanLine = line.replace(/\*\*/g, '')
+          return (
+            <p key={index} className={cn("text-sm", isBold && "font-semibold")}>
+              {cleanLine}
+            </p>
+          )
+        }
+        
+        // Bold text
+        if (line.includes('**')) {
+          const parts = line.split(/\*\*(.*?)\*\*/g)
+          return (
+            <p key={index} className="text-sm">
+              {parts.map((part, i) => 
+                i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+              )}
+            </p>
+          )
+        }
+        
+        // Bullet points
+        if (line.startsWith('- ') || line.startsWith('• ')) {
+          return (
+            <p key={index} className="text-sm pl-4">
+              {line}
+            </p>
+          )
+        }
+        
+        // Numbered items
+        if (line.match(/^\d+\./)) {
+          return (
+            <p key={index} className="text-sm pl-4">
+              {line}
+            </p>
+          )
+        }
+        
+        // Empty lines
+        if (line.trim() === '') {
+          return <div key={index} className="h-2" />
+        }
+        
+        // Regular text
+        return (
+          <p key={index} className="text-sm">
+            {line}
+          </p>
+        )
+      })}
+    </div>
+  )
+}
+
 export function ChatInterface() {
   const [input, setInput] = useState('')
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useState<string>('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const { messages, sendMessage, status } = useChat<FarmingAgentMessage>({
-    transport: new DefaultChatTransport({ api: '/api/chat' }),
-  })
+  const { messages, isLoading, error, sendMessage, clearMessages, setError, fetchSessions } = useChatStore()
 
-  const isLoading = status === 'streaming' || status === 'submitted'
+  // Initialize session ID on mount
+  useEffect(() => {
+    const storedSessionId = sessionStorage.getItem('currentSessionId')
+    if (storedSessionId) {
+      setSessionId(storedSessionId)
+    } else {
+      const newSessionId = generateSessionId()
+      setSessionId(newSessionId)
+      sessionStorage.setItem('currentSessionId', newSessionId)
+    }
+  }, [])
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -66,31 +135,39 @@ export function ChatInterface() {
     }
   }, [input])
 
-  const handleSubmit = useCallback((e?: React.FormEvent) => {
+  // Fetch sessions on mount
+  useEffect(() => {
+    fetchSessions('farming')
+  }, [fetchSessions])
+
+  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault()
-    if (!input.trim() || isLoading) return
+    if (!input.trim() || isLoading || !sessionId) return
 
-    let messageText = input
-    if (uploadedImage) {
-      messageText = `[User uploaded an image]\n${input}`
-    }
-
-    sendMessage({ text: messageText })
+    setError(null)
+    
+    await sendMessage(input.trim(), sessionId, {
+      mode: 'farming',
+      image: uploadedImage || undefined,
+    })
+    
     setInput('')
     setUploadedImage(null)
-  }, [input, isLoading, sendMessage, uploadedImage])
+  }, [input, isLoading, sessionId, sendMessage, uploadedImage, setError])
 
-  const handleQuickAction = (prompt: string) => {
-    setInput(prompt)
-    setTimeout(() => {
-      sendMessage({ text: prompt })
-      setInput('')
-    }, 100)
+  const handleQuickAction = async (prompt: string) => {
+    if (isLoading || !sessionId) return
+    setError(null)
+    await sendMessage(prompt, sessionId, { mode: 'farming' })
   }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        setError('Image size must be less than 10MB')
+        return
+      }
       const reader = new FileReader()
       reader.onload = (event) => {
         setUploadedImage(event.target?.result as string)
@@ -106,102 +183,11 @@ export function ChatInterface() {
     }
   }
 
-  const renderMessagePart = (part: FarmingAgentMessage['parts'][number], index: number) => {
-    switch (part.type) {
-      case 'text':
-        return (
-          <div key={index} className="prose prose-sm dark:prose-invert max-w-none">
-            <div className="whitespace-pre-wrap">{part.text}</div>
-          </div>
-        )
-
-      case 'tool-analyzeSoil':
-        if (part.state === 'input-streaming' || part.state === 'input-available') {
-          return (
-            <SoilAnalysisCard
-              key={index}
-              data={{ state: 'analyzing', message: 'Analyzing soil composition...' }}
-            />
-          )
-        }
-        if (part.state === 'output-available') {
-          return <SoilAnalysisCard key={index} data={part.output as never} />
-        }
-        return null
-
-      case 'tool-recommendCrops':
-        if (part.state === 'input-streaming' || part.state === 'input-available') {
-          return (
-            <CropRecommendationCard
-              key={index}
-              data={{ state: 'searching', message: 'Finding optimal crops...' }}
-            />
-          )
-        }
-        if (part.state === 'output-available') {
-          return <CropRecommendationCard key={index} data={part.output as never} />
-        }
-        return null
-
-      case 'tool-recommendFertilizer':
-        if (part.state === 'input-streaming' || part.state === 'input-available') {
-          return (
-            <FertilizerCard
-              key={index}
-              data={{ state: 'calculating', message: 'Calculating fertilizer recommendations...' }}
-            />
-          )
-        }
-        if (part.state === 'output-available') {
-          return <FertilizerCard key={index} data={part.output as never} />
-        }
-        return null
-
-      case 'tool-getPlantingTiming':
-        if (part.state === 'input-streaming' || part.state === 'input-available') {
-          return (
-            <PlantingTimingCard
-              key={index}
-              data={{ state: 'fetching', message: 'Checking weather and timing...' }}
-            />
-          )
-        }
-        if (part.state === 'output-available') {
-          return <PlantingTimingCard key={index} data={part.output as never} />
-        }
-        return null
-
-      case 'tool-analyzeDiseaseImage':
-        if (part.state === 'input-streaming' || part.state === 'input-available') {
-          return (
-            <DiseaseDetectionCard
-              key={index}
-              data={{ state: 'scanning', message: 'Scanning for diseases...' }}
-            />
-          )
-        }
-        if (part.state === 'output-available') {
-          return <DiseaseDetectionCard key={index} data={part.output as never} />
-        }
-        return null
-
-      case 'tool-getMarketInsights':
-        if (part.state === 'input-streaming' || part.state === 'input-available') {
-          return (
-            <MarketInsightsCard
-              key={index}
-              data={{ state: 'fetching', message: 'Fetching market data...' }}
-            />
-          )
-        }
-        if (part.state === 'output-available') {
-          return <MarketInsightsCard key={index} data={part.output as never} />
-        }
-        return null
-
-      default:
-        return null
-    }
+  const handleNewChat = () => {
+    clearMessages()
+    const newSessionId = generateSessionId()
+    setSessionId(newSessionId)
+    sessionStorage.setItem('currentSessionId', newSessionId)
   }
 
   return (
@@ -230,6 +216,7 @@ export function ChatInterface() {
                     size="sm"
                     className="h-auto py-3 px-4 text-left justify-start text-wrap"
                     onClick={() => handleQuickAction(action.prompt)}
+                    disabled={isLoading}
                   >
                     <Sparkles className="w-4 h-4 mr-2 shrink-0 text-primary" />
                     <span className="text-sm">{action.label}</span>
@@ -239,9 +226,22 @@ export function ChatInterface() {
             </div>
           ) : (
             <>
-              {messages.map((message) => (
+              {/* New Chat Button */}
+              <div className="flex justify-center">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleNewChat}
+                  className="gap-2"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Start New Chat
+                </Button>
+              </div>
+
+              {messages.map((message, index) => (
                 <div
-                  key={message.id}
+                  key={index}
                   className={cn(
                     'flex gap-4',
                     message.role === 'user' ? 'justify-end' : 'justify-start'
@@ -256,13 +256,26 @@ export function ChatInterface() {
                   )}
                   <div
                     className={cn(
-                      'max-w-[85%] space-y-3',
+                      'max-w-[85%]',
                       message.role === 'user'
                         ? 'bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-3'
                         : 'flex-1'
                     )}
                   >
-                    {message.parts.map((part, index) => renderMessagePart(part, index))}
+                    {message.role === 'user' ? (
+                      <div className="space-y-2">
+                        {message.imageUrl && (
+                          <p className="text-xs opacity-80">[Image attached]</p>
+                        )}
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      </div>
+                    ) : (
+                      <Card className="border-0 shadow-sm bg-muted/50">
+                        <CardContent className="p-4">
+                          {formatMessage(message.content)}
+                        </CardContent>
+                      </Card>
+                    )}
                   </div>
                   {message.role === 'user' && (
                     <Avatar className="w-8 h-8 shrink-0">
@@ -286,7 +299,7 @@ export function ChatInterface() {
                 </div>
               )}
 
-              {isLoading && messages[messages.length - 1]?.role === 'user' && (
+              {isLoading && (
                 <div className="flex gap-4 justify-start">
                   <Avatar className="w-8 h-8 shrink-0">
                     <AvatarFallback className="bg-primary text-primary-foreground">
@@ -295,8 +308,31 @@ export function ChatInterface() {
                   </Avatar>
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Spinner className="w-4 h-4" />
-                    <span className="text-sm">Thinking...</span>
+                    <span className="text-sm">Analyzing and thinking...</span>
                   </div>
+                </div>
+              )}
+
+              {error && (
+                <div className="flex gap-4 justify-start">
+                  <Avatar className="w-8 h-8 shrink-0">
+                    <AvatarFallback className="bg-destructive text-destructive-foreground">
+                      <AlertCircle className="w-4 h-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <Card className="border-destructive/50 bg-destructive/10">
+                    <CardContent className="p-4">
+                      <p className="text-sm text-destructive">{error}</p>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2"
+                        onClick={() => setError(null)}
+                      >
+                        Dismiss
+                      </Button>
+                    </CardContent>
+                  </Card>
                 </div>
               )}
             </>
@@ -340,6 +376,7 @@ export function ChatInterface() {
               className="shrink-0"
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoading}
+              title="Upload image for soil or plant analysis"
             >
               <ImagePlus className="h-5 w-5" />
               <span className="sr-only">Upload image</span>
@@ -371,7 +408,7 @@ export function ChatInterface() {
             </Button>
           </form>
           <p className="text-xs text-muted-foreground text-center mt-3">
-            AI-powered farming advice. Always verify recommendations with local experts.
+            Powered by Google Gemini AI. Always verify recommendations with local experts.
           </p>
         </div>
       </div>

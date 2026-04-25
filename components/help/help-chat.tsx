@@ -1,22 +1,20 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport, UIMessage } from 'ai'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import {
   Send,
   HelpCircle,
   User,
   Lightbulb,
-  ArrowRight,
-  Sparkles,
+  ThumbsUp,
+  ThumbsDown,
+  AlertCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -31,31 +29,108 @@ interface HelpChatProps {
   className?: string
 }
 
+interface HelpMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
 const suggestedQuestions = [
   'How do I input my soil data?',
   'What do NPK values mean?',
   'How does crop recommendation work?',
   'How can I detect plant diseases?',
+  'How do I upload images for analysis?',
+  'What market insights can you provide?',
 ]
+
+function generateHelpSessionId(): string {
+  return `help_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+}
+
+function formatHelpMessage(content: string): React.ReactNode {
+  const lines = content.split('\n')
+  
+  return (
+    <div className="space-y-1.5">
+      {lines.map((line, index) => {
+        // Headers with emoji
+        if (line.match(/^[📚💡🔍✅⚠️📖🌱]/)) {
+          const isBold = line.includes('**')
+          const cleanLine = line.replace(/\*\*/g, '')
+          return (
+            <p key={index} className={cn("text-sm", isBold && "font-semibold")}>
+              {cleanLine}
+            </p>
+          )
+        }
+        
+        // Bold text
+        if (line.includes('**')) {
+          const parts = line.split(/\*\*(.*?)\*\*/g)
+          return (
+            <p key={index} className="text-sm">
+              {parts.map((part, i) => 
+                i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+              )}
+            </p>
+          )
+        }
+        
+        // Bullet points
+        if (line.startsWith('- ') || line.startsWith('• ')) {
+          return (
+            <p key={index} className="text-sm pl-3">
+              {line}
+            </p>
+          )
+        }
+        
+        // Numbered items
+        if (line.match(/^\d+\./)) {
+          return (
+            <p key={index} className="text-sm pl-3">
+              {line}
+            </p>
+          )
+        }
+        
+        // Empty lines
+        if (line.trim() === '') {
+          return <div key={index} className="h-1" />
+        }
+        
+        // Regular text
+        return (
+          <p key={index} className="text-sm">
+            {line}
+          </p>
+        )
+      })}
+    </div>
+  )
+}
 
 export function HelpChat({ farmContext, className }: HelpChatProps) {
   const [input, setInput] = useState('')
+  const [messages, setMessages] = useState<HelpMessage[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useState<string>('')
+  const [feedbackGiven, setFeedbackGiven] = useState<Set<number>>(new Set())
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const { messages, sendMessage, status } = useChat({
-    transport: new DefaultChatTransport({
-      api: '/api/help',
-      prepareSendMessagesRequest: ({ messages }) => ({
-        body: {
-          messages,
-          farmContext,
-        },
-      }),
-    }),
-  })
-
-  const isLoading = status === 'streaming' || status === 'submitted'
+  // Initialize session ID on mount
+  useEffect(() => {
+    const storedSessionId = sessionStorage.getItem('helpSessionId')
+    if (storedSessionId) {
+      setSessionId(storedSessionId)
+    } else {
+      const newSessionId = generateHelpSessionId()
+      setSessionId(newSessionId)
+      sessionStorage.setItem('helpSessionId', newSessionId)
+    }
+  }, [])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -70,15 +145,54 @@ export function HelpChat({ farmContext, className }: HelpChatProps) {
     }
   }, [input])
 
+  const sendHelpMessage = useCallback(async (content: string) => {
+    if (!content.trim() || isLoading || !sessionId) return
+
+    setError(null)
+    const userMessage: HelpMessage = { role: 'user', content: content.trim() }
+    setMessages(prev => [...prev, userMessage])
+    setIsLoading(true)
+
+    try {
+      const response = await fetch('/api/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [...messages, { role: 'user', content: content.trim() }],
+          sessionId,
+          mode: 'help',
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to get response')
+      }
+
+      const data = await response.json()
+      
+      const assistantMessage: HelpMessage = {
+        role: 'assistant',
+        content: data.message,
+      }
+      
+      setMessages(prev => [...prev, assistantMessage])
+    } catch (err) {
+      console.error('Error sending help message:', err)
+      setError('Failed to get help. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [messages, isLoading, sessionId])
+
   const handleSubmit = useCallback((e?: React.FormEvent) => {
     e?.preventDefault()
     if (!input.trim() || isLoading) return
-    sendMessage({ text: input })
+    sendHelpMessage(input)
     setInput('')
-  }, [input, isLoading, sendMessage])
+  }, [input, isLoading, sendHelpMessage])
 
   const handleSuggestion = (question: string) => {
-    sendMessage({ text: question })
+    sendHelpMessage(question)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -88,84 +202,10 @@ export function HelpChat({ farmContext, className }: HelpChatProps) {
     }
   }
 
-  const getMessageText = (message: UIMessage): string => {
-    return message.parts
-      ?.filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-      .map((p) => p.text)
-      .join('') || ''
-  }
-
-  const renderToolResult = (part: UIMessage['parts'][number]) => {
-    if (part.type === 'tool-explainFeature' && part.state === 'output-available') {
-      const output = part.output as {
-        title: string
-        description: string
-        howToUse: string
-        tips: string[]
-      }
-      return (
-        <Card className="mt-3 bg-secondary/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              {output.title}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">{output.description}</p>
-            <div>
-              <p className="text-sm font-medium mb-1">How to Use:</p>
-              <p className="text-sm text-muted-foreground">{output.howToUse}</p>
-            </div>
-            {output.tips.length > 0 && (
-              <div>
-                <p className="text-sm font-medium mb-1">Tips:</p>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  {output.tips.map((tip, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <Lightbulb className="h-3 w-3 mt-1 text-accent shrink-0" />
-                      <span>{tip}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )
-    }
-
-    if (part.type === 'tool-suggestNextSteps' && part.state === 'output-available') {
-      const output = part.output as {
-        topic: string
-        nextSteps: string[]
-        relatedFeatures: string[]
-      }
-      return (
-        <Card className="mt-3 bg-secondary/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <ArrowRight className="h-4 w-4 text-primary" />
-              Suggested Next Steps
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <ul className="text-sm space-y-2">
-              {output.nextSteps.map((step, i) => (
-                <li key={i} className="flex items-start gap-2">
-                  <Badge variant="outline" className="shrink-0 text-xs">
-                    {i + 1}
-                  </Badge>
-                  <span className="text-muted-foreground">{step}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )
-    }
-
-    return null
+  const handleFeedback = (messageIndex: number, helpful: boolean) => {
+    setFeedbackGiven(prev => new Set(prev).add(messageIndex))
+    // In a real app, you'd send this feedback to an API
+    console.log(`Message ${messageIndex} marked as ${helpful ? 'helpful' : 'not helpful'}`)
   }
 
   return (
@@ -196,6 +236,7 @@ export function HelpChat({ farmContext, className }: HelpChatProps) {
                       size="sm"
                       className="justify-start text-left h-auto py-2 px-3"
                       onClick={() => handleSuggestion(q)}
+                      disabled={isLoading}
                     >
                       <Lightbulb className="h-4 w-4 mr-2 text-primary shrink-0" />
                       <span className="text-sm">{q}</span>
@@ -205,9 +246,9 @@ export function HelpChat({ farmContext, className }: HelpChatProps) {
               </div>
             ) : (
               <>
-                {messages.map((message) => (
+                {messages.map((message, index) => (
                   <div
-                    key={message.id}
+                    key={index}
                     className={cn(
                       'flex gap-3',
                       message.role === 'user' ? 'justify-end' : 'justify-start'
@@ -229,21 +270,41 @@ export function HelpChat({ farmContext, className }: HelpChatProps) {
                       )}
                     >
                       {message.role === 'user' ? (
-                        <p className="text-sm">{getMessageText(message)}</p>
+                        <p className="text-sm">{message.content}</p>
                       ) : (
                         <div className="space-y-2">
-                          {message.parts.map((part, i) => {
-                            if (part.type === 'text') {
-                              return (
-                                <p key={i} className="text-sm whitespace-pre-wrap">
-                                  {part.text}
-                                </p>
-                              )
-                            }
-                            return (
-                              <div key={i}>{renderToolResult(part)}</div>
-                            )
-                          })}
+                          <Card className="border-0 shadow-sm bg-muted/50">
+                            <CardContent className="p-3">
+                              {formatHelpMessage(message.content)}
+                            </CardContent>
+                          </Card>
+                          {/* Feedback buttons */}
+                          {!feedbackGiven.has(index) && (
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>Was this helpful?</span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => handleFeedback(index, true)}
+                              >
+                                <ThumbsUp className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => handleFeedback(index, false)}
+                              >
+                                <ThumbsDown className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          )}
+                          {feedbackGiven.has(index) && (
+                            <p className="text-xs text-muted-foreground">
+                              Thanks for your feedback!
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>
@@ -257,7 +318,7 @@ export function HelpChat({ farmContext, className }: HelpChatProps) {
                   </div>
                 ))}
 
-                {isLoading && messages[messages.length - 1]?.role === 'user' && (
+                {isLoading && (
                   <div className="flex gap-3 justify-start">
                     <Avatar className="w-7 h-7 shrink-0">
                       <AvatarFallback className="bg-primary text-primary-foreground text-xs">
@@ -266,8 +327,23 @@ export function HelpChat({ farmContext, className }: HelpChatProps) {
                     </Avatar>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Spinner className="w-3 h-3" />
-                      <span className="text-xs">Thinking...</span>
+                      <span className="text-xs">Finding answer...</span>
                     </div>
+                  </div>
+                )}
+
+                {error && (
+                  <div className="flex gap-3 justify-start">
+                    <Avatar className="w-7 h-7 shrink-0">
+                      <AvatarFallback className="bg-destructive text-destructive-foreground text-xs">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <Card className="border-destructive/50 bg-destructive/10">
+                      <CardContent className="p-2">
+                        <p className="text-xs text-destructive">{error}</p>
+                      </CardContent>
+                    </Card>
                   </div>
                 )}
               </>

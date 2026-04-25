@@ -1,9 +1,11 @@
 'use client'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useEffect } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Empty } from '@/components/ui/empty'
+import { Badge } from '@/components/ui/badge'
 import {
   History,
   MessageSquare,
@@ -11,13 +13,32 @@ import {
   ArrowRight,
   Clock,
   Leaf,
+  HelpCircle,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useChatStore } from '@/lib/chat-store'
 import { formatDistanceToNow } from 'date-fns'
 
 export default function HistoryPage() {
-  const { sessions, deleteSession, clearAllSessions } = useChatStore()
+  const { sessions, fetchSessions, deleteSession } = useChatStore()
+
+  useEffect(() => {
+    fetchSessions()
+  }, [fetchSessions])
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (confirm('Delete this conversation?')) {
+      await deleteSession(sessionId)
+    }
+  }
+
+  const handleClearAll = async () => {
+    if (confirm('Are you sure you want to clear all chat history? This cannot be undone.')) {
+      for (const session of sessions) {
+        await deleteSession(session.session_id)
+      }
+    }
+  }
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
@@ -36,11 +57,7 @@ export default function HistoryPage() {
             variant="outline"
             size="sm"
             className="text-destructive hover:text-destructive"
-            onClick={() => {
-              if (confirm('Are you sure you want to clear all chat history?')) {
-                clearAllSessions()
-              }
-            }}
+            onClick={handleClearAll}
           >
             <Trash2 className="h-4 w-4 mr-2" />
             Clear All
@@ -76,19 +93,24 @@ export default function HistoryPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3 flex-1 min-w-0">
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                        <MessageSquare className="h-5 w-5 text-primary" />
+                        {session.mode === 'help' ? (
+                          <HelpCircle className="h-5 w-5 text-primary" />
+                        ) : (
+                          <MessageSquare className="h-5 w-5 text-primary" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium truncate">{session.title}</h3>
-                        <p className="text-sm text-muted-foreground truncate">
-                          {session.preview}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium truncate">{session.title}</h3>
+                          <Badge variant="secondary" className="text-xs shrink-0">
+                            {session.mode === 'help' ? 'Help' : 'Farming'}
+                          </Badge>
+                        </div>
                         <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {formatDistanceToNow(session.timestamp, { addSuffix: true })}
+                            {formatDistanceToNow(new Date(session.updated_at), { addSuffix: true })}
                           </span>
-                          <span>{session.messageCount} messages</span>
                         </div>
                       </div>
                     </div>
@@ -97,15 +119,11 @@ export default function HistoryPage() {
                         variant="ghost"
                         size="icon"
                         className="text-muted-foreground hover:text-destructive"
-                        onClick={() => {
-                          if (confirm('Delete this conversation?')) {
-                            deleteSession(session.id)
-                          }
-                        }}
+                        onClick={() => handleDeleteSession(session.session_id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                      <Link href={`/?session=${session.id}`}>
+                      <Link href={`/?session=${session.session_id}`}>
                         <Button variant="ghost" size="icon">
                           <ArrowRight className="h-4 w-4" />
                         </Button>

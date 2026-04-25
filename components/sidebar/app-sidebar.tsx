@@ -50,7 +50,7 @@ const capabilities = [
 // Quick actions with colors
 const quickActions = [
   { 
-    name: 'Analyze Soil', 
+    name: 'Soil', 
     icon: Droplets, 
     href: '/?action=soil', 
     bgColor: 'bg-primary/15',
@@ -60,7 +60,7 @@ const quickActions = [
     iconBg: 'bg-primary/20'
   },
   { 
-    name: 'Detect Disease', 
+    name: 'Disease', 
     icon: Bug, 
     href: '/?action=disease', 
     bgColor: 'bg-destructive/15',
@@ -70,7 +70,7 @@ const quickActions = [
     iconBg: 'bg-destructive/20'
   },
   { 
-    name: 'Plan Crops', 
+    name: 'Crops', 
     icon: Sprout, 
     href: '/?action=crops', 
     bgColor: 'bg-chart-2/15',
@@ -80,7 +80,7 @@ const quickActions = [
     iconBg: 'bg-chart-2/20'
   },
   { 
-    name: 'Weather Check', 
+    name: 'Weather', 
     icon: CloudRain, 
     href: '/?action=weather', 
     bgColor: 'bg-chart-3/15',
@@ -90,7 +90,7 @@ const quickActions = [
     iconBg: 'bg-chart-3/20'
   },
   { 
-    name: 'Market Prices', 
+    name: 'Market', 
     icon: TrendingUp, 
     href: '/?action=market', 
     bgColor: 'bg-accent/15',
@@ -116,7 +116,7 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
     fetchSessions('farming')
   }, [fetchSessions])
 
-  // Close sidebar on escape key
+  // Close sidebar on escape key (mobile only)
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen && window.innerWidth < 1024) {
@@ -129,7 +129,7 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
 
   // Prevent body scroll when mobile sidebar is open
   useEffect(() => {
-    if (isOpen && window.innerWidth < 1024) {
+    if (isOpen && typeof window !== 'undefined' && window.innerWidth < 1024) {
       document.body.style.overflow = 'hidden'
     } else {
       document.body.style.overflow = ''
@@ -140,12 +140,14 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
   }, [isOpen])
 
   const handleNavigation = () => {
-    if (window.innerWidth < 1024) onToggle()
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      onToggle()
+    }
   }
 
   return (
     <>
-      {/* Mobile overlay with fade animation */}
+      {/* Mobile overlay */}
       <div
         className={cn(
           'fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300',
@@ -155,23 +157,26 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
         aria-hidden="true"
       />
 
-      {/* Sidebar - Drawer on mobile, fixed on desktop */}
+      {/* Sidebar */}
       <aside
         ref={sidebarRef}
         className={cn(
-          'fixed top-0 left-0 z-50 h-full bg-sidebar text-sidebar-foreground flex flex-col',
-          'transition-transform duration-300 ease-out lg:transition-[width] lg:duration-200',
-          // Mobile: full drawer with transform
-          'w-[85vw] max-w-[320px]',
+          'bg-sidebar text-sidebar-foreground flex flex-col h-screen',
+          // Mobile: fixed drawer
+          'fixed top-0 left-0 z-50 w-[280px] max-w-[85vw]',
+          'transition-transform duration-300 ease-out',
           isOpen ? 'translate-x-0' : '-translate-x-full',
-          // Desktop: width-based toggle
-          'lg:translate-x-0 lg:relative',
-          isOpen ? 'lg:w-72' : 'lg:w-16'
+          // Desktop: relative positioning with width transition
+          'lg:relative lg:translate-x-0 lg:z-0',
+          'lg:transition-[width] lg:duration-200 lg:ease-out',
+          isOpen ? 'lg:w-64' : 'lg:w-16',
+          // Ensure it's above main content on desktop when expanded
+          'lg:shrink-0'
         )}
       >
-        {/* Header */}
+        {/* Header - Fixed height */}
         <div className={cn(
-          'flex items-center h-14 sm:h-16 px-3 sm:px-4 border-b border-sidebar-border shrink-0',
+          'flex items-center h-14 px-3 border-b border-sidebar-border shrink-0',
           !isOpen && 'lg:justify-center lg:px-2'
         )}>
           {isOpen ? (
@@ -185,11 +190,10 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
                   <span className="text-[10px] text-sidebar-foreground/50">Smart Farming</span>
                 </div>
               </div>
-              {/* Close button - more prominent on mobile */}
               <Button
                 variant="ghost"
                 size="icon"
-                className="shrink-0 text-sidebar-foreground hover:bg-sidebar-accent h-9 w-9 lg:h-8 lg:w-8"
+                className="shrink-0 text-sidebar-foreground hover:bg-sidebar-accent h-9 w-9"
                 onClick={onToggle}
                 aria-label="Close sidebar"
               >
@@ -201,7 +205,7 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="hidden lg:flex text-sidebar-foreground hover:bg-sidebar-accent"
+              className="hidden lg:flex text-sidebar-foreground hover:bg-sidebar-accent h-9 w-9"
               onClick={onToggle}
               aria-label="Open sidebar"
             >
@@ -210,14 +214,14 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
           )}
         </div>
 
-        {/* Main Scrollable Content */}
-        <ScrollArea className="flex-1">
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
           <div className={cn('pb-4', !isOpen && 'hidden lg:block')}>
             
-            {/* Quick Actions - Horizontal Scrollable Section */}
+            {/* Quick Actions - Horizontal Scroll */}
             {isOpen && (
               <div className="pt-4 pb-2">
-                <div className="flex items-center justify-between px-4 mb-3">
+                <div className="flex items-center justify-between px-3 mb-2">
                   <div className="flex items-center gap-1.5">
                     <Zap className="h-3.5 w-3.5 text-sidebar-primary" />
                     <p className="text-xs font-semibold text-sidebar-foreground/80 uppercase tracking-wide">
@@ -227,8 +231,8 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
                 </div>
                 
                 {/* Horizontal scroll container */}
-                <ScrollArea className="w-full" type="scroll">
-                  <div className="flex gap-2 px-4 pb-2">
+                <div className="overflow-x-auto px-3 pb-2 scrollbar-thin scrollbar-thumb-sidebar-accent scrollbar-track-transparent">
+                  <div className="flex gap-2 w-max">
                     {quickActions.map((action) => (
                       <Link 
                         key={action.name} 
@@ -238,9 +242,9 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
                       >
                         <button
                           className={cn(
-                            "flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-200",
-                            "min-w-[85px] w-[85px]",
-                            "hover:scale-[1.03] active:scale-[0.97]",
+                            "flex flex-col items-center gap-1.5 p-2.5 rounded-xl border transition-all duration-200",
+                            "min-w-[70px] w-[70px]",
+                            "hover:scale-[1.02] active:scale-[0.98]",
                             "touch-manipulation shadow-sm hover:shadow-md",
                             action.bgColor,
                             action.hoverBg,
@@ -249,25 +253,24 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
                           )}
                         >
                           <div className={cn(
-                            "w-10 h-10 rounded-lg flex items-center justify-center",
+                            "w-8 h-8 rounded-lg flex items-center justify-center",
                             action.iconBg
                           )}>
-                            <action.icon className="h-5 w-5" />
+                            <action.icon className="h-4 w-4" />
                           </div>
-                          <span className="text-[10px] font-semibold leading-tight text-center whitespace-nowrap">
+                          <span className="text-[10px] font-semibold leading-tight text-center">
                             {action.name}
                           </span>
                         </button>
                       </Link>
                     ))}
                   </div>
-                  <ScrollBar orientation="horizontal" className="h-1.5" />
-                </ScrollArea>
+                </div>
               </div>
             )}
 
             {/* Main Navigation */}
-            <nav className={cn('px-3 py-3 space-y-0.5', !isOpen && 'lg:px-2')}>
+            <nav className={cn('px-2 py-2 space-y-0.5', !isOpen && 'lg:px-2')}>
               <p className={cn(
                 'text-[10px] font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-2 px-2',
                 !isOpen && 'lg:hidden'
@@ -281,9 +284,9 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
                     <Button
                       variant="ghost"
                       className={cn(
-                        'w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-11 px-3',
+                        'w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-10 px-2',
                         isActive && 'bg-sidebar-accent text-sidebar-accent-foreground font-medium',
-                        !isOpen && 'lg:justify-center lg:w-11 lg:h-11 lg:p-0 lg:mx-auto'
+                        !isOpen && 'lg:justify-center lg:w-10 lg:h-10 lg:p-0 lg:mx-auto'
                       )}
                       title={!isOpen ? item.name : undefined}
                     >
@@ -294,7 +297,6 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
                       {isOpen && (
                         <div className="flex flex-col items-start min-w-0">
                           <span className="text-sm">{item.name}</span>
-                          <span className="text-[10px] text-sidebar-foreground/50">{item.description}</span>
                         </div>
                       )}
                     </Button>
@@ -305,7 +307,7 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
 
             {/* Recent Chats */}
             {isOpen && (
-              <div className="px-3 mt-4">
+              <div className="px-2 mt-3">
                 <div className="flex items-center justify-between px-2 mb-2">
                   <div className="flex items-center gap-1.5">
                     <Clock className="h-3 w-3 text-sidebar-foreground/50" />
@@ -318,17 +320,17 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
                       <Button 
                         variant="ghost" 
                         size="icon"
-                        className="h-7 w-7 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+                        className="h-6 w-6 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent"
                         title="New Chat"
                       >
-                        <Plus className="h-3.5 w-3.5" />
+                        <Plus className="h-3 w-3" />
                       </Button>
                     </Link>
                     <Link href="/history">
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="h-7 text-[10px] text-sidebar-foreground/50 hover:text-sidebar-foreground px-2"
+                        className="h-6 text-[10px] text-sidebar-foreground/50 hover:text-sidebar-foreground px-1.5"
                       >
                         All
                       </Button>
@@ -337,15 +339,15 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
                 </div>
                 
                 {sessions.length > 0 ? (
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     {sessions.slice(0, 4).map((session) => (
                       <Link key={session.id} href={`/?session=${session.session_id}`} onClick={handleNavigation}>
-                        <button className="flex items-center gap-3 w-full px-2 py-2.5 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all duration-200 text-left group">
-                          <div className="w-8 h-8 rounded-lg bg-sidebar-accent/50 flex items-center justify-center shrink-0 group-hover:bg-sidebar-primary/20 transition-colors">
-                            <MessageSquare className="h-4 w-4 text-sidebar-foreground/60 group-hover:text-sidebar-primary transition-colors" />
+                        <button className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all duration-200 text-left group">
+                          <div className="w-7 h-7 rounded-lg bg-sidebar-accent/50 flex items-center justify-center shrink-0 group-hover:bg-sidebar-primary/20 transition-colors">
+                            <MessageSquare className="h-3.5 w-3.5 text-sidebar-foreground/60 group-hover:text-sidebar-primary transition-colors" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="truncate text-sm font-medium">{session.title}</p>
+                            <p className="truncate text-xs font-medium">{session.title}</p>
                             <p className="text-[10px] text-sidebar-foreground/40">
                               {new Date(session.updated_at).toLocaleDateString(undefined, {
                                 month: 'short',
@@ -358,11 +360,11 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
                     ))}
                   </div>
                 ) : (
-                  <div className="px-2 py-6 text-center rounded-lg bg-sidebar-accent/30">
-                    <MessageSquare className="h-8 w-8 mx-auto text-sidebar-foreground/20 mb-2" />
-                    <p className="text-xs text-sidebar-foreground/40 mb-2">No recent chats</p>
+                  <div className="px-2 py-4 text-center rounded-lg bg-sidebar-accent/30">
+                    <MessageSquare className="h-6 w-6 mx-auto text-sidebar-foreground/20 mb-1.5" />
+                    <p className="text-[10px] text-sidebar-foreground/40 mb-2">No recent chats</p>
                     <Link href="/" onClick={handleNavigation}>
-                      <Button variant="ghost" size="sm" className="h-8 text-xs text-sidebar-primary hover:text-sidebar-primary hover:bg-sidebar-primary/10">
+                      <Button variant="ghost" size="sm" className="h-7 text-[10px] text-sidebar-primary hover:text-sidebar-primary hover:bg-sidebar-primary/10">
                         Start chatting
                       </Button>
                     </Link>
@@ -373,12 +375,12 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
 
             {/* Capabilities */}
             {isOpen && (
-              <div className="px-3 mt-5">
+              <div className="px-2 mt-4">
                 <div className="flex items-center justify-between px-2 mb-2">
                   <p className="text-[10px] font-semibold text-sidebar-foreground/50 uppercase tracking-wider">
                     Capabilities
                   </p>
-                  <Badge variant="secondary" className="text-[9px] bg-sidebar-accent text-sidebar-accent-foreground h-5 px-1.5">
+                  <Badge variant="secondary" className="text-[9px] bg-sidebar-accent text-sidebar-accent-foreground h-4 px-1">
                     {capabilities.length}
                   </Badge>
                 </div>
@@ -387,10 +389,10 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
                     <Link key={cap.name} href={cap.href} onClick={handleNavigation}>
                       <Button
                         variant="ghost"
-                        className="w-full justify-start gap-3 h-10 px-2 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        className="w-full justify-start gap-2 h-9 px-2 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                       >
                         <cap.icon className={cn('h-4 w-4 shrink-0', cap.color)} />
-                        <span className="text-sm">{cap.name}</span>
+                        <span className="text-xs">{cap.name}</span>
                       </Button>
                     </Link>
                   ))}
@@ -398,17 +400,17 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
-        {/* Footer */}
+        {/* Footer - Fixed height */}
         <div className={cn(
-          'border-t border-sidebar-border p-3 shrink-0 bg-sidebar',
+          'border-t border-sidebar-border p-2 shrink-0 bg-sidebar',
           !isOpen && 'hidden lg:block lg:p-2'
         )}>
           {isOpen && (
             <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-sidebar-accent/30">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sidebar-primary to-sidebar-primary/60 flex items-center justify-center">
-                <Leaf className="w-4 h-4 text-sidebar-primary-foreground" />
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-sidebar-primary to-sidebar-primary/60 flex items-center justify-center">
+                <Leaf className="w-3.5 h-3.5 text-sidebar-primary-foreground" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium truncate">Farm AI v2.0</p>

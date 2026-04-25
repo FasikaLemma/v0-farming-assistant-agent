@@ -37,23 +37,29 @@ export function MainLayout({ children }: MainLayoutProps) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen w-screen overflow-hidden bg-background">
+      {/* Sidebar */}
       <AppSidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Main Content Area */}
+      <div className={cn(
+        "flex-1 flex flex-col min-w-0 h-screen transition-all duration-200",
+        // On desktop, adjust margin based on sidebar state
+        "lg:ml-0"
+      )}>
         {/* Mobile Header */}
-        <header className="lg:hidden flex items-center h-16 px-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0">
+        <header className="lg:hidden flex items-center h-14 px-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0 z-10">
           <MobileMenuButton onClick={() => setSidebarOpen(true)} />
           <div className="flex items-center gap-2 ml-3">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <Leaf className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="font-semibold">Farm AI Assistant</span>
+            <span className="font-semibold text-sm">Farm AI Assistant</span>
           </div>
         </header>
 
-        {/* Main Content */}
-        <main className="flex-1 overflow-hidden">
+        {/* Main Content - Scrollable */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden">
           {children}
         </main>
       </div>

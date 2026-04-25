@@ -3,7 +3,6 @@
 import { useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Empty } from '@/components/ui/empty'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -41,29 +40,30 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <History className="h-6 w-6 text-primary" />
-            Chat History
-          </h1>
-          <p className="text-muted-foreground">
-            Review your past conversations with the farming assistant
-          </p>
+    <div className="min-h-full p-4 sm:p-6">
+      <div className="container mx-auto max-w-4xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+              <History className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+              Chat History
+            </h1>
+            <p className="text-muted-foreground text-sm sm:text-base">
+              Review your past conversations with the farming assistant
+            </p>
+          </div>
+          {sessions.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:text-destructive w-full sm:w-auto"
+              onClick={handleClearAll}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Clear All
+            </Button>
+          )}
         </div>
-        {sessions.length > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-destructive hover:text-destructive"
-            onClick={handleClearAll}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Clear All
-          </Button>
-        )}
-      </div>
 
       {sessions.length === 0 ? (
         <Card>
@@ -85,8 +85,7 @@ export default function HistoryPage() {
           </CardContent>
         </Card>
       ) : (
-        <ScrollArea className="h-[calc(100vh-200px)]">
-          <div className="space-y-3">
+        <div className="space-y-3">
             {sessions.map((session) => (
               <Card key={session.id} className="hover:bg-muted/50 transition-colors">
                 <CardContent className="p-4">
@@ -134,8 +133,8 @@ export default function HistoryPage() {
               </Card>
             ))}
           </div>
-        </ScrollArea>
-      )}
+        )}
+      </div>
     </div>
   )
 }

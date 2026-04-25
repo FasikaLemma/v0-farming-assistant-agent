@@ -52,8 +52,8 @@ export function MainLayout({ children }: MainLayoutProps) {
           </div>
         </header>
 
-        {/* Main Content */}
-        <main className="flex-1 overflow-hidden">
+        {/* Main Content - Scrollable */}
+        <main className="flex-1 overflow-auto">
           {children}
         </main>
       </div>

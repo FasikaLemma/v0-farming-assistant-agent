@@ -22,6 +22,7 @@ import {
   Droplets,
   Bug,
   TrendingUp,
+  HelpCircle,
 } from 'lucide-react'
 import { useChatStore } from '@/lib/chat-store'
 
@@ -29,6 +30,7 @@ const navigation = [
   { name: 'Chat', href: '/', icon: MessageSquare },
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'History', href: '/history', icon: History },
+  { name: 'Help', href: '/help', icon: HelpCircle },
 ]
 
 const capabilities = [

@@ -15,7 +15,9 @@ import {
   User,
   Leaf,
   X,
+  HelpCircle,
 } from 'lucide-react'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import {
   SoilAnalysisCard,
@@ -271,6 +273,18 @@ export function ChatInterface() {
                   )}
                 </div>
               ))}
+
+              {/* Need Help Button - shown after conversation starts */}
+              {messages.length > 0 && messages[messages.length - 1]?.role === 'assistant' && !isLoading && (
+                <div className="flex justify-center pt-2">
+                  <Link href="/help">
+                    <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
+                      <HelpCircle className="h-4 w-4" />
+                      Need help understanding this?
+                    </Button>
+                  </Link>
+                </div>
+              )}
 
               {isLoading && messages[messages.length - 1]?.role === 'user' && (
                 <div className="flex gap-4 justify-start">

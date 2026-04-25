@@ -1,0 +1,190 @@
+{
+  "common": {
+    "appName": "የእርሻ AI ረዳት",
+    "loading": "በመጫን ላይ...",
+    "error": "ስህተት",
+    "success": "ተሳክቷል",
+    "cancel": "ሰርዝ",
+    "save": "አስቀምጥ",
+    "delete": "ሰርዝ",
+    "edit": "አስተካክል",
+    "close": "ዝጋ",
+    "back": "ተመለስ",
+    "next": "ቀጥል",
+    "submit": "አስገባ",
+    "send": "ላክ",
+    "search": "ፈልግ",
+    "clear": "አጽዳ",
+    "clearAll": "ሁሉንም አጽዳ",
+    "viewAll": "ሁሉንም ተመልከት",
+    "new": "አዲስ",
+    "start": "ጀምር"
+  },
+  "nav": {
+    "dashboard": "ዳሽቦርድ",
+    "chat": "ውይይት",
+    "history": "ታሪክ",
+    "help": "እገዛ",
+    "overview": "አጠቃላይ እይታ"
+  },
+  "sidebar": {
+    "quickActions": "ፈጣን ተግባራት",
+    "capabilities": "ችሎታዎች",
+    "recentChats": "የቅርብ ጊዜ ውይይቶች",
+    "newChat": "አዲስ ውይይት",
+    "noChats": "የቅርብ ጊዜ ውይይት የለም",
+    "collapse": "ጎንዮሽ መስኮት ዝጋ",
+    "expand": "ጎንዮሽ መስኮት ክፈት"
+  },
+  "quickActions": {
+    "soil": "አፈር",
+    "disease": "በሽታ",
+    "crops": "ሰብሎች",
+    "weather": "የአየር ሁኔታ",
+    "market": "ገበያ",
+    "analyzeSoil": "አፈር ተንትን",
+    "detectDisease": "በሽታ ለይ",
+    "planCrops": "ሰብሎች አቅድ",
+    "checkWeather": "የአየር ሁኔታ ፈትሽ",
+    "marketPrices": "የገበያ ዋጋዎች"
+  },
+  "capabilities": {
+    "cropHealth": "የሰብል ጤና",
+    "soilFertility": "አፈር እና ለምነት",
+    "cropAdvice": "የሰብል ምክር",
+    "weather": "የአየር ሁኔታ",
+    "market": "ገበያ"
+  },
+  "chat": {
+    "placeholder": "ስለ አፈር፣ ሰብሎች፣ የአየር ሁኔታ ይጠይቁ ወይም ፎቶ ይስቀሉ...",
+    "placeholderHelp": "ስለ መተግበሪያው አጠቃቀም ማንኛውንም ጥያቄ ይጠይቁ...",
+    "welcome": "እንኳን ወደ የእርሻ AI ረዳት በደህና መጡ",
+    "welcomeSubtitle": "ብልህ የእርሻ ጓደኛዎ። ስለ አፈር ትንተና፣ የሰብል ምክሮች፣ የበሽታ ማወቂያ ወይም የገበያ ግንዛቤዎች ይጠይቁኝ።",
+    "helpWelcome": "እንዴት ልረዳዎ?",
+    "helpSubtitle": "ስለ የእርሻ AI ረዳት አጠቃቀም ማንኛውንም ነገር ይጠይቁኝ",
+    "analyzing": "ጥያቄዎን በመተንተን ላይ...",
+    "loadingHistory": "ውይይት በመጫን ላይ...",
+    "uploadImage": "ፎቶ ስቀል",
+    "removeImage": "ፎቶ አስወግድ",
+    "imageAttached": "ፎቶ ተያይዟል",
+    "startNewChat": "አዲስ ውይይት ጀምር",
+    "sendMessage": "መልእክት ላክ",
+    "voiceInput": "በድምፅ ግባት",
+    "suggestions": {
+      "soilAnalysis": "አፈሬን ተንትን",
+      "cropRecommendation": "ለእርሻዬ ሰብሎች አቅርብ",
+      "diseaseDetection": "የተክል በሽታ ለመለየት ረዳኝ",
+      "weather": "ምርጥ የመትከያ ጊዜ ማነው?",
+      "market": "የአሁኑ የገበያ ዋጋዎች",
+      "fertilizer": "የማዳበሪያ ምክሮች"
+    },
+    "helpSuggestions": {
+      "howToUseSoil": "የአፈር ትንተና እንዴት እጠቀማለሁ?",
+      "whatIsCrop": "የሰብል ምክር ምንድን ነው?",
+      "howToUpload": "ፎቶ እንዴት እሰቅላለሁ?",
+      "explainDisease": "የበሽታ ማወቂያን አብራራ"
+    }
+  },
+  "dashboard": {
+    "title": "የእርሻ ዳሽቦርድ",
+    "subtitle": "የእርሻዎን ጤና ይከታተሉ እና AI-ተኮር ግንዛቤዎች ያግኙ",
+    "tabs": {
+      "overview": "አጠቃላይ እይታ",
+      "cropHealth": "የሰብል ጤና",
+      "soil": "አፈር እና ለምነት",
+      "recommendations": "ምክሮች",
+      "weather": "የአየር ሁኔታ",
+      "market": "ገበያ"
+    },
+    "stats": {
+      "activeCrops": "ንቁ ሰብሎች",
+      "soilHealth": "የአፈር ጤና",
+      "weatherAlert": "የአየር ሁኔታ ማሳወቂያ",
+      "marketTrend": "የገበያ አዝማሚያ"
+    },
+    "alerts": {
+      "title": "ንቁ ማሳወቂያዎች",
+      "noAlerts": "ንቁ ማሳወቂያ የለም"
+    }
+  },
+  "history": {
+    "title": "የውይይት ታሪክ",
+    "subtitle": "ከእርሻ ረዳቱ ጋር ያደረጉትን ያለፉ ውይይቶች ይመልከቱ",
+    "empty": "የውይይት ታሪክ የለም",
+    "emptyDescription": "የውይይት ታሪክዎን እዚህ ለማየት ውይይት ይጀምሩ",
+    "startChat": "ውይይት ጀምር",
+    "deleteSession": "ይህን ውይይት ሰርዝ",
+    "clearAllConfirm": "ሁሉንም የውይይት ታሪክ መሰረዝ ይፈልጋሉ?"
+  },
+  "help": {
+    "title": "የእገዛ ማዕከል",
+    "subtitle": "የእርሻ AI ረዳት ለመጠቀም እገዛ ያግኙ",
+    "searchPlaceholder": "እገዛ ፈልግ...",
+    "categories": {
+      "gettingStarted": "መጀመሪያ ጀምር",
+      "soilCrops": "አፈር እና ሰብሎች",
+      "fertilizer": "ማዳበሪያ",
+      "disease": "የበሽታ ማወቂያ",
+      "market": "የገበያ ግንዛቤዎች"
+    },
+    "askAI": "AI ን ጠይቅ",
+    "aiAssistant": "AI የእገዛ ረዳት",
+    "aiAssistantDescription": "ከ AI ረዳታችን ፈጣን መልሶች ያግኙ",
+    "faq": "በተደጋጋሚ የሚጠየቁ ጥያቄዎች",
+    "tips": "የእርሻ ምክሮች"
+  },
+  "crops": {
+    "tomato": "ቲማቲም",
+    "corn": "በቆሎ",
+    "wheat": "ስንዴ",
+    "rice": "ሩዝ",
+    "potato": "ድንች",
+    "teff": "ጤፍ",
+    "barley": "ገብስ",
+    "sorghum": "ማሽላ",
+    "coffee": "ቡና",
+    "chickpea": "ሽምብራ",
+    "lentil": "ምስር",
+    "onion": "ሽንኩርት",
+    "pepper": "በርበሬ",
+    "cabbage": "ጎመን"
+  },
+  "soil": {
+    "nitrogen": "ናይትሮጅን",
+    "phosphorus": "ፎስፈረስ",
+    "potassium": "ፖታሲየም",
+    "ph": "የፒኤች መጠን",
+    "moisture": "እርጥበት",
+    "organic": "ኦርጋኒክ ንጥረ ነገር",
+    "low": "ዝቅተኛ",
+    "optimal": "ጥሩ",
+    "high": "ከፍተኛ",
+    "acidic": "አሲዳማ",
+    "neutral": "ገለልተኛ",
+    "alkaline": "አልካላይን"
+  },
+  "weather": {
+    "temperature": "ሙቀት",
+    "humidity": "እርጥበት",
+    "rainfall": "ዝናብ",
+    "wind": "ንፋስ",
+    "forecast": "ትንበያ",
+    "today": "ዛሬ",
+    "tomorrow": "ነገ",
+    "sunny": "ፀሐያማ",
+    "cloudy": "ደመናማ",
+    "rainy": "ዝናባማ"
+  },
+  "ai": {
+    "analysis": "ትንተና",
+    "recommendation": "ምክር",
+    "nextSteps": "ቀጣይ እርምጃዎች",
+    "confidence": "እምነት",
+    "disclaimer": "ይህ በ AI የተፈጠረ ምክር ነው። ሁልጊዜ የአካባቢ የግብርና ባለሙያዎችን ያማክሩ።"
+  },
+  "language": {
+    "en": "English",
+    "am": "አማርኛ",
+    "switchTo": "ቋንቋ ቀይር"
+  }
+}

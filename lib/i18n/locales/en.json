@@ -1,0 +1,190 @@
+{
+  "common": {
+    "appName": "Farm AI Assistant",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "submit": "Submit",
+    "send": "Send",
+    "search": "Search",
+    "clear": "Clear",
+    "clearAll": "Clear All",
+    "viewAll": "View All",
+    "new": "New",
+    "start": "Start"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "chat": "Chat",
+    "history": "History",
+    "help": "Help",
+    "overview": "Overview"
+  },
+  "sidebar": {
+    "quickActions": "Quick Actions",
+    "capabilities": "Capabilities",
+    "recentChats": "Recent Chats",
+    "newChat": "New Chat",
+    "noChats": "No recent chats",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar"
+  },
+  "quickActions": {
+    "soil": "Soil",
+    "disease": "Disease",
+    "crops": "Crops",
+    "weather": "Weather",
+    "market": "Market",
+    "analyzeSoil": "Analyze Soil",
+    "detectDisease": "Detect Disease",
+    "planCrops": "Plan Crops",
+    "checkWeather": "Check Weather",
+    "marketPrices": "Market Prices"
+  },
+  "capabilities": {
+    "cropHealth": "Crop Health",
+    "soilFertility": "Soil & Fertility",
+    "cropAdvice": "Crop Advice",
+    "weather": "Weather",
+    "market": "Market"
+  },
+  "chat": {
+    "placeholder": "Ask about soil, crops, weather, or upload an image...",
+    "placeholderHelp": "Ask any question about using the app...",
+    "welcome": "Welcome to Farm AI Assistant",
+    "welcomeSubtitle": "Your intelligent farming companion. Ask me about soil analysis, crop recommendations, disease detection, or market insights.",
+    "helpWelcome": "How can I help you?",
+    "helpSubtitle": "Ask me anything about using the Farm AI Assistant",
+    "analyzing": "Analyzing your request...",
+    "loadingHistory": "Loading conversation...",
+    "uploadImage": "Upload Image",
+    "removeImage": "Remove image",
+    "imageAttached": "Image attached",
+    "startNewChat": "Start New Chat",
+    "sendMessage": "Send message",
+    "voiceInput": "Voice input",
+    "suggestions": {
+      "soilAnalysis": "Analyze my soil",
+      "cropRecommendation": "Recommend crops for my farm",
+      "diseaseDetection": "Help identify plant disease",
+      "weather": "What's the best planting time?",
+      "market": "Current market prices",
+      "fertilizer": "Fertilizer recommendations"
+    },
+    "helpSuggestions": {
+      "howToUseSoil": "How do I use soil analysis?",
+      "whatIsCrop": "What is crop recommendation?",
+      "howToUpload": "How to upload images?",
+      "explainDisease": "Explain disease detection"
+    }
+  },
+  "dashboard": {
+    "title": "Farm Dashboard",
+    "subtitle": "Monitor your farm's health and get AI-powered insights",
+    "tabs": {
+      "overview": "Overview",
+      "cropHealth": "Crop Health",
+      "soil": "Soil & Fertility",
+      "recommendations": "Recommendations",
+      "weather": "Weather",
+      "market": "Market"
+    },
+    "stats": {
+      "activeCrops": "Active Crops",
+      "soilHealth": "Soil Health",
+      "weatherAlert": "Weather Alert",
+      "marketTrend": "Market Trend"
+    },
+    "alerts": {
+      "title": "Active Alerts",
+      "noAlerts": "No active alerts"
+    }
+  },
+  "history": {
+    "title": "Chat History",
+    "subtitle": "Review your past conversations with the farming assistant",
+    "empty": "No chat history",
+    "emptyDescription": "Start a conversation to see your chat history here",
+    "startChat": "Start Chatting",
+    "deleteSession": "Delete this conversation",
+    "clearAllConfirm": "Are you sure you want to clear all chat history?"
+  },
+  "help": {
+    "title": "Help Center",
+    "subtitle": "Get help using Farm AI Assistant",
+    "searchPlaceholder": "Search for help...",
+    "categories": {
+      "gettingStarted": "Getting Started",
+      "soilCrops": "Soil & Crops",
+      "fertilizer": "Fertilizer",
+      "disease": "Disease Detection",
+      "market": "Market Insights"
+    },
+    "askAI": "Ask AI",
+    "aiAssistant": "AI Help Assistant",
+    "aiAssistantDescription": "Get instant answers from our AI helper",
+    "faq": "Frequently Asked Questions",
+    "tips": "Farming Tips"
+  },
+  "crops": {
+    "tomato": "Tomato",
+    "corn": "Corn",
+    "wheat": "Wheat",
+    "rice": "Rice",
+    "potato": "Potato",
+    "teff": "Teff",
+    "barley": "Barley",
+    "sorghum": "Sorghum",
+    "coffee": "Coffee",
+    "chickpea": "Chickpea",
+    "lentil": "Lentil",
+    "onion": "Onion",
+    "pepper": "Pepper",
+    "cabbage": "Cabbage"
+  },
+  "soil": {
+    "nitrogen": "Nitrogen",
+    "phosphorus": "Phosphorus",
+    "potassium": "Potassium",
+    "ph": "pH Level",
+    "moisture": "Moisture",
+    "organic": "Organic Matter",
+    "low": "Low",
+    "optimal": "Optimal",
+    "high": "High",
+    "acidic": "Acidic",
+    "neutral": "Neutral",
+    "alkaline": "Alkaline"
+  },
+  "weather": {
+    "temperature": "Temperature",
+    "humidity": "Humidity",
+    "rainfall": "Rainfall",
+    "wind": "Wind",
+    "forecast": "Forecast",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "sunny": "Sunny",
+    "cloudy": "Cloudy",
+    "rainy": "Rainy"
+  },
+  "ai": {
+    "analysis": "Analysis",
+    "recommendation": "Recommendation",
+    "nextSteps": "Next Steps",
+    "confidence": "Confidence",
+    "disclaimer": "This is AI-generated advice. Always consult local agricultural experts."
+  },
+  "language": {
+    "en": "English",
+    "am": "አማርኛ",
+    "switchTo": "Switch language"
+  }
+}

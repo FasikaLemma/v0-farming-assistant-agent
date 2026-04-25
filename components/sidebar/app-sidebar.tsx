@@ -75,11 +75,26 @@ const capabilities = [
   },
 ]
 
-// Quick actions for farmers
+// Quick actions for farmers with distinct colors
 const quickActions = [
-  { name: 'Analyze Soil', icon: Droplets, href: '/?action=soil' },
-  { name: 'Detect Disease', icon: Bug, href: '/?action=disease' },
-  { name: 'Plan Crops', icon: Sprout, href: '/?action=crops' },
+  { 
+    name: 'Analyze Soil', 
+    icon: Droplets, 
+    href: '/', 
+    color: 'bg-primary/10 hover:bg-primary/20 border-primary/40 text-primary hover:border-primary'
+  },
+  { 
+    name: 'Detect Disease', 
+    icon: Bug, 
+    href: '/', 
+    color: 'bg-destructive/10 hover:bg-destructive/20 border-destructive/40 text-destructive hover:border-destructive'
+  },
+  { 
+    name: 'Plan Crops', 
+    icon: Sprout, 
+    href: '/', 
+    color: 'bg-chart-2/10 hover:bg-chart-2/20 border-chart-2/40 text-chart-2 hover:border-chart-2'
+  },
 ]
 
 interface AppSidebarProps {
@@ -224,13 +239,16 @@ export function AppSidebar({ isOpen, onToggle }: AppSidebarProps) {
             <div className="grid grid-cols-3 gap-2">
               {quickActions.map((action) => (
                 <Link key={action.name} href={action.href}>
-                  <Button
-                    variant="outline"
-                    className="w-full h-auto py-3 flex-col gap-1.5 border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:border-sidebar-accent"
+                  <button
+                    className={cn(
+                      "w-full h-auto py-3 flex flex-col items-center gap-1.5 rounded-lg border-2 transition-all duration-200",
+                      "hover:scale-[1.02] hover:shadow-sm active:scale-[0.98]",
+                      action.color
+                    )}
                   >
                     <action.icon className="h-5 w-5" />
-                    <span className="text-[10px] leading-tight text-center">{action.name}</span>
-                  </Button>
+                    <span className="text-[10px] leading-tight text-center font-medium">{action.name}</span>
+                  </button>
                 </Link>
               ))}
             </div>

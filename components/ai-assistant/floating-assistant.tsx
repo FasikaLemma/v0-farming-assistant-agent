@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { useChat } from '@ai-sdk/react'
+import { DefaultChatTransport } from 'ai'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
@@ -21,36 +23,54 @@ import {
   ImagePlus,
 } from 'lucide-react'
 
-interface Message {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: Date
-}
-
 const quickSuggestions = [
-  'Analyze my soil',
-  'Best crops for spring',
-  'Detect plant disease',
-  'Market prices today',
+  { label: 'Analyze my soil', color: 'bg-primary/20 hover:bg-primary/30 text-primary' },
+  { label: 'Best crops for spring', color: 'bg-chart-2/20 hover:bg-chart-2/30 text-chart-2' },
+  { label: 'Detect plant disease', color: 'bg-destructive/20 hover:bg-destructive/30 text-destructive' },
+  { label: 'Market prices today', color: 'bg-accent/20 hover:bg-accent/30 text-accent-foreground' },
 ]
+
+// Helper to extract text from UIMessage parts
+function getMessageText(message: { parts?: Array<{ type: string; text?: string }> }): string {
+  if (!message.parts || !Array.isArray(message.parts)) return ''
+  return message.parts
+    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+    .map((p) => p.text)
+    .join('')
+}
 
 export function FloatingAssistant() {
   const [isOpen, setIsOpen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [input, setInput] = useState('')
-  const [messages, setMessages] = useState<Message[]>([])
-  const [isLoading, setIsLoading] = useState(false)
   const [sessionId] = useState(() => `floating-${Date.now()}`)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
 
+  // Create transport for chat API
+  const transport = useMemo(() => {
+    return new DefaultChatTransport({
+      api: '/api/chat',
+      headers: { 'Content-Type': 'application/json' },
+      prepareSendMessagesRequest: ({ messages }) => ({
+        body: { messages, sessionId },
+      }),
+    })
+  }, [sessionId])
+
+  const { messages, sendMessage, status } = useChat({
+    transport,
+    id: sessionId,
+  })
+
+  const isLoading = status === 'streaming' || status === 'submitted'
+
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, status])
 
   // Initialize speech recognition
   useEffect(() => {
@@ -86,78 +106,27 @@ export function FloatingAssistant() {
     }
   }
 
-  const sendMessage = useCallback(async (content: string, imageData?: string) => {
-    if (!content.trim() && !imageData) return
-
-    const userMessage: Message = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: imageData ? `[Image uploaded] ${content}` : content,
-      timestamp: new Date(),
-    }
-
-    setMessages(prev => [...prev, userMessage])
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!input.trim() || isLoading) return
+    sendMessage({ text: input.trim() })
     setInput('')
-    setIsLoading(true)
+  }
 
-    try {
-      const response = await fetch('/api/agent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId,
-          message: content,
-          mode: 'farming',
-          image: imageData,
-        }),
-      })
+  const handleSuggestionClick = (suggestion: string) => {
+    if (isLoading) return
+    sendMessage({ text: suggestion })
+  }
 
-      const data = await response.json()
-
-      if (data.error) {
-        throw new Error(data.error)
-      }
-
-      const assistantMessage: Message = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: data.response,
-        timestamp: new Date(),
-      }
-
-      setMessages(prev => [...prev, assistantMessage])
-    } catch (error) {
-      const errorMessage: Message = {
-        id: `error-${Date.now()}`,
-        role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
-        timestamp: new Date(),
-      }
-      setMessages(prev => [...prev, errorMessage])
-    } finally {
-      setIsLoading(false)
-    }
-  }, [sessionId])
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
     const reader = new FileReader()
     reader.onloadend = () => {
-      const base64 = reader.result as string
-      sendMessage('Please analyze this image', base64.split(',')[1])
+      sendMessage({ text: 'Please analyze this plant/soil image for any issues or diseases.' })
     }
     reader.readAsDataURL(file)
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    sendMessage(input)
-  }
-
-  const handleSuggestionClick = (suggestion: string) => {
-    sendMessage(suggestion)
   }
 
   return (
@@ -196,14 +165,16 @@ export function FloatingAssistant() {
               </div>
               <div>
                 <h3 className="font-semibold text-sm">Farm AI Assistant</h3>
-                <p className="text-xs text-muted-foreground">Always here to help</p>
+                <p className="text-xs text-muted-foreground">
+                  {isLoading ? 'Thinking...' : 'Always here to help'}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-8 w-8 hover:bg-primary/10"
                 onClick={() => setIsExpanded(!isExpanded)}
               >
                 {isExpanded ? (
@@ -215,7 +186,7 @@ export function FloatingAssistant() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
                 onClick={() => setIsOpen(false)}
               >
                 <X className="h-4 w-4" />
@@ -239,12 +210,15 @@ export function FloatingAssistant() {
                 <div className="flex flex-wrap gap-2 justify-center">
                   {quickSuggestions.map((suggestion) => (
                     <Badge
-                      key={suggestion}
-                      variant="secondary"
-                      className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
-                      onClick={() => handleSuggestionClick(suggestion)}
+                      key={suggestion.label}
+                      className={cn(
+                        "cursor-pointer transition-all duration-200 hover:scale-105",
+                        suggestion.color,
+                        isLoading && "opacity-50 cursor-not-allowed"
+                      )}
+                      onClick={() => handleSuggestionClick(suggestion.label)}
                     >
-                      {suggestion}
+                      {suggestion.label}
                     </Badge>
                   ))}
                 </div>
@@ -278,7 +252,7 @@ export function FloatingAssistant() {
                           : 'bg-muted rounded-tl-sm'
                       )}
                     >
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      <p className="whitespace-pre-wrap">{getMessageText(message)}</p>
                     </div>
                   </div>
                 ))}
@@ -291,9 +265,9 @@ export function FloatingAssistant() {
                     </Avatar>
                     <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3">
                       <div className="flex gap-1">
-                        <span className="w-2 h-2 bg-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-2 h-2 bg-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-2 h-2 bg-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                       </div>
                     </div>
                   </div>
@@ -317,7 +291,7 @@ export function FloatingAssistant() {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="shrink-0"
+                className="shrink-0 hover:bg-primary/10"
                 onClick={() => fileInputRef.current?.click()}
               >
                 <ImagePlus className="h-5 w-5" />
@@ -327,7 +301,7 @@ export function FloatingAssistant() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Ask me anything..."
-                  className="min-h-[44px] max-h-32 pr-10 resize-none"
+                  className="min-h-[44px] max-h-32 pr-10 resize-none focus-visible:ring-primary"
                   rows={1}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -342,7 +316,7 @@ export function FloatingAssistant() {
                   size="icon"
                   className={cn(
                     'absolute right-1 top-1 h-8 w-8',
-                    isListening && 'text-destructive'
+                    isListening && 'text-destructive bg-destructive/10'
                   )}
                   onClick={toggleListening}
                 >
@@ -356,7 +330,7 @@ export function FloatingAssistant() {
               <Button
                 type="submit"
                 size="icon"
-                className="shrink-0"
+                className="shrink-0 bg-primary hover:bg-primary/90"
                 disabled={!input.trim() || isLoading}
               >
                 <Send className="h-5 w-5" />
